@@ -49,25 +49,11 @@ void setup() {
   Serial.begin(115200);
   usb_hid.begin();
 
-#if defined(CFG_TUH_MAX3421) && CFG_TUH_MAX3421
-  // init host stack on controller (rhport) 1
-  // For rp2040: this is called in core1's setup1()
-  USBHost.begin(1);
-#endif
-
   //while ( !Serial ) delay(10);   // wait for native usb
   Serial.println("TinyUSB Host HID Remap Example");
 }
 
-#if defined(CFG_TUH_MAX3421) && CFG_TUH_MAX3421
-//--------------------------------------------------------------------+
-// Using Host shield MAX3421E controller
-//--------------------------------------------------------------------+
-void loop() {
-  USBHost.task();
-}
-
-#elif defined(ARDUINO_ARCH_RP2040)
+#if defined(ARDUINO_ARCH_RP2040)
 //--------------------------------------------------------------------+
 // For RP2040 use both core0 for device stack, core1 for host stack
 //--------------------------------------------------------------------+
