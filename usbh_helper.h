@@ -17,9 +17,9 @@
   #include "pio_usb.h"
 
   // Pin D+ for host, D- = D+ + 1
-  #ifndef PIN_USB_HOST_DP
-  #define PIN_USB_HOST_DP  12
-  #endif
+  // #ifndef PIN_USB_HOST_DP
+  // #define PIN_USB_HOST_DP  12  // defined in pin_setup_helper.h
+  // #endif
 
   // Pin for enabling Host VBUS. comment out if not used
   // #ifndef PIN_5V_EN

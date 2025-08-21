@@ -36,6 +36,8 @@
 #define PRINT_SERIAL_DELAY 1
 
 // USBHost is defined in usbh_helper.h
+#include "pin_setup_helper.h"
+
 #include "usbh_helper.h"
 
 // HID report descriptor using TinyUSB's template
@@ -49,6 +51,7 @@ Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROT
 
 void setup() {
   Serial.begin(115200);
+  set_pinMode();
   usb_hid.begin();
 
 #if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
