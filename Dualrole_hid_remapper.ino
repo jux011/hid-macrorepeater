@@ -82,6 +82,9 @@ void loop() {
 
 //------------- Core1 -------------//
 void setup1() {
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  while ( !Serial ) delay(10);   // wait for native usb
+#endif
   // configure pio-usb: defined in usbh_helper.h
   rp2040_configure_pio_usb();
 
