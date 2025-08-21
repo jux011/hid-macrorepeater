@@ -42,7 +42,7 @@ Adafruit_USBH_Host USBHost;
 #ifdef ARDUINO_ARCH_RP2040
 static void rp2040_configure_pio_usb(void) {
   //while ( !Serial ) delay(10);   // wait for native usb
-  Serial.println("Core1 setup to run TinyUSB host with pio-usb");
+  Serial.print("Core1 setup to run TinyUSB host with pio-usb\r\n");
 
   // Check for CPU frequency, must be multiple of 12 Mhz for bit-banging USB
   uint32_t cpu_hz = clock_get_hz(clk_sys);
