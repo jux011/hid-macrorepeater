@@ -42,6 +42,15 @@ bool lastSwitchStates[4] = {LOW, LOW, LOW, LOW};
 bool switchStates[4] = {LOW, LOW, LOW, LOW};
 bool sent_message[4] = {false, false, false, false}; // verbose input state reporting
 
+// -------- Switch logic --------
+bool should_save_to_macro(bool* booleanStates) {
+  return booleanStates[1]; //== HIGH;
+}
+
+bool should_send_passthrough(bool* booleanStates) {
+  return booleanStates[2] == LOW || booleanStates[1] == LOW;
+}
+
 //------------- Core0 -------------//
 void setup() {
   Serial.begin(115200);
@@ -205,12 +214,14 @@ extern "C" {
     if (len != 8) {
       Serial.printf("report len = %u NOT 8, probably something wrong !!\r\n", len);
     } else {
-      if (switchStates[1] == HIGH) {
+      if (should_save_to_macro(switchStates)) {
         save_to_macro((hid_keyboard_report_t const *)report);
       }
 
-      while (!usb_hid.ready()) { yield(); }
-      usb_hid.sendReport(0, report, sizeof(hid_keyboard_report_t));
+      if (should_send_passthrough(switchStates)) {
+        while (!usb_hid.ready()) { yield(); }
+        usb_hid.sendReport(0, report, sizeof(hid_keyboard_report_t));
+      }
     }
 
     // Continue to request the next report as before...
