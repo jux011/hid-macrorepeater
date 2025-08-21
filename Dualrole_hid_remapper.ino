@@ -33,6 +33,8 @@
  * - number <-> its symbol (with shift)
  */
 
+#define PRINT_SERIAL_DELAY 1
+
 // USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
 
@@ -49,8 +51,10 @@ void setup() {
   Serial.begin(115200);
   usb_hid.begin();
 
-  //while ( !Serial ) delay(10);   // wait for native usb
-  Serial.println("TinyUSB Host HID Remap Example");
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  while ( !Serial ) delay(10);   // wait for native usb
+  Serial.printf("TinyUSB Host HID Remap Example\r\n");
+#endif
 }
 
 #if defined(ARDUINO_ARCH_RP2040)
@@ -64,6 +68,9 @@ void loop() {
 
 //------------- Core1 -------------//
 void setup1() {
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  while ( !Serial ) delay(10);   // wait for native usb
+#endif
   // configure pio-usb: defined in usbh_helper.h
   rp2040_configure_pio_usb();
 
