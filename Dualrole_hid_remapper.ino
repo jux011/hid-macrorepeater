@@ -33,6 +33,8 @@
  * - number <-> its symbol (with shift)
  */
 
+#define PRINT_SERIAL_DELAY 1
+
 // USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
 
@@ -55,8 +57,10 @@ void setup() {
   USBHost.begin(1);
 #endif
 
-  //while ( !Serial ) delay(10);   // wait for native usb
-  Serial.println("TinyUSB Host HID Remap Example");
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  while ( !Serial ) delay(10);   // wait for native usb
+  Serial.printf("TinyUSB Host HID Remap Example\r\n");
+#endif
 }
 
 #if defined(CFG_TUH_MAX3421) && CFG_TUH_MAX3421

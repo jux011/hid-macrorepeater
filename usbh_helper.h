@@ -18,13 +18,13 @@
 
   // Pin D+ for host, D- = D+ + 1
   #ifndef PIN_USB_HOST_DP
-  #define PIN_USB_HOST_DP  16
+  #define PIN_USB_HOST_DP  12
   #endif
 
   // Pin for enabling Host VBUS. comment out if not used
-  #ifndef PIN_5V_EN
-  #define PIN_5V_EN        18
-  #endif
+  // #ifndef PIN_5V_EN
+  // #define PIN_5V_EN        18
+  // #endif
 
   #ifndef PIN_5V_EN_STATE
   #define PIN_5V_EN_STATE  1
@@ -56,9 +56,10 @@
 
 #ifdef ARDUINO_ARCH_RP2040
 static void rp2040_configure_pio_usb(void) {
-  //while ( !Serial ) delay(10);   // wait for native usb
-  Serial.println("Core1 setup to run TinyUSB host with pio-usb");
-
+  #if defined(INIT_DELAY_FOR_SERIAL) && INIT_DELAY_FOR_SERIAL
+    while ( !Serial ) delay(10);   // wait for native usb
+    Serial.printf("Core1 setup to run TinyUSB host with pio-usb\r\n");
+  #endif
   // Check for CPU frequency, must be multiple of 12 Mhz for bit-banging USB
   uint32_t cpu_hz = clock_get_hz(clk_sys);
   if (cpu_hz % 12000000UL) {
