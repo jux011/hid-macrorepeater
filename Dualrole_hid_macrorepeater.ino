@@ -11,7 +11,6 @@
 
 #define PRINT_SERIAL_DELAY 1
 
-// USBHost is defined in usbh_helper.h
 #include "pin_setup_helper.h"
 
 #include "usbh_helper.h"
@@ -32,14 +31,20 @@ size_t macroLen = 0;
 bool macro_is_playing = false;
 
 // -------- Input Setup --------
+unsigned long lastToggleTime = 0;
+int ledState = LOW;
 const unsigned long debounceDelay = 50;
-unsigned long lastDebounceTime = 0;
-bool lastSwitchState = LOW;
-bool switchState = LOW;
+const int PIN_IN[4] = {PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN};
+unsigned long lastDebounceTimes[4] = {0,0,0,0};
+bool lastSwitchStates[4] = {LOW, LOW, LOW, LOW};
+bool switchStates[4] = {LOW, LOW, LOW, LOW};
+bool sent_message[4] = {false, false, false, false}; // verbose input state reporting
 
+//------------- Core0 -------------//
 void setup() {
   Serial.begin(115200);
   set_pinMode();
+  set_output_poweron();
   usb_hid.begin();
 
 #if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
@@ -48,24 +53,35 @@ void setup() {
 #endif
 }
 
-#if defined(ARDUINO_ARCH_RP2040)
-//--------------------------------------------------------------------+
-// For RP2040 use both core0 for device stack, core1 for host stack
-//--------------------------------------------------------------------+
-
+//------------- Core0 -------------//
 void loop() {
-  bool reading = digitalRead(PIN_BUTTON_IN);
-  if (reading != lastSwitchState) {
-    lastDebounceTime = millis();
-    lastSwitchState = reading;
-  }
-  
-  if (((millis() - lastDebounceTime) > debounceDelay)
-    && (reading != switchState)) {
-    switchState = reading;
+  const unsigned long now_timestamp = millis();
+  for (int i = 0; i<4;i++) {
+    bool reading = digitalRead(PIN_IN[i]);
+    if (reading != lastSwitchStates[i]) {
+      lastDebounceTimes[i] = now_timestamp;
+      lastSwitchStates[i] = reading;
+    }
+
+    if (((now_timestamp - lastDebounceTimes[i]) > debounceDelay)
+      && (reading != switchStates[i])) {
+      switchStates[i] = reading;
+    }
   }
 
-  if (switchState == HIGH) {
+  for (int i = 0; i<4;i++) { // verbose input state reporting
+    if (switchStates[i] == HIGH) {
+      if (!sent_message[i]) {
+        Serial.printf("switch %u on\r\n", i);
+        sent_message[i] = true;
+      }
+    }
+    else {
+      sent_message[i] = false;
+    }
+  }
+
+  if (switchStates[0] == HIGH) {
     if (macro_is_playing) {
       Serial.println("Button held down");
     }
@@ -101,7 +117,6 @@ void setup1() {
 void loop1() {
   USBHost.task();
 }
-#endif
 
 // Macro playback: Send all recorded reports to PC in order
 void play_macro() {
