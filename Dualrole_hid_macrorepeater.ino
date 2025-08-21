@@ -9,30 +9,6 @@
  any redistribution
 *********************************************************************/
 
-/* This example demonstrates use of both device and host, where
- * - Device run on native usb controller (roothub port0)
- * - Host depending on MCUs run on either:
- *   - rp2040: bit-banging 2 GPIOs with the help of Pico-PIO-USB library (roothub port1)
- *   - samd21/51, nrf52840, esp32: using MAX3421e controller (host shield)
- *
- * Requirements:
- * - For rp2040:
- *   - [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB) library
- *   - 2 consecutive GPIOs: D+ is defined by PIN_USB_HOST_DP, D- = D+ +1
- *   - Provide VBus (5v) and GND for peripheral
- *   - CPU Speed must be either 120 or 240 Mhz. Selected via "Menu -> CPU Speed"
- * - For samd21/51, nrf52840, esp32:
- *   - Additional MAX2341e USB Host shield or featherwing is required
- *   - SPI instance, CS pin, INT pin are correctly configured in usbh_helper.h
- */
-
-/* Example sketch receive keyboard report from host interface (from e.g consumer keyboard)
- * and remap it to another key and send it via device interface (to PC). For simplicity,
- * this example only toggle shift key to the report, effectively remap:
- * - all character key <-> upper case
- * - number <-> its symbol (with shift)
- */
-
 #define PRINT_SERIAL_DELAY 1
 
 // USBHost is defined in usbh_helper.h
@@ -49,6 +25,18 @@ uint8_t const desc_hid_report[] = {
 // USB HID object: desc report, desc len, protocol, interval, use out endpoint
 Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
 
+// -------- Macro Buffer --------
+#define MACRO_BUFFER_SIZE 250
+hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
+size_t macroLen = 0;
+bool macro_is_playing = false;
+
+// -------- Input Setup --------
+const unsigned long debounceDelay = 50;
+unsigned long lastDebounceTime = 0;
+bool lastSwitchState = LOW;
+bool switchState = LOW;
+
 void setup() {
   Serial.begin(115200);
   set_pinMode();
@@ -56,7 +44,7 @@ void setup() {
 
 #if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
   while ( !Serial ) delay(10);   // wait for native usb
-  Serial.printf("TinyUSB Host HID Remap Example\r\n");
+  Serial.print("TinyUSB Macro Recorder Example\r\n");
 #endif
 }
 
@@ -66,7 +54,34 @@ void setup() {
 //--------------------------------------------------------------------+
 
 void loop() {
-  // nothing to do
+  bool reading = digitalRead(PIN_BUTTON_IN);
+  if (reading != lastSwitchState) {
+    lastDebounceTime = millis();
+    lastSwitchState = reading;
+  }
+  
+  if (((millis() - lastDebounceTime) > debounceDelay)
+    && (reading != switchState)) {
+    switchState = reading;
+  }
+
+  if (switchState == HIGH) {
+    if (macro_is_playing) {
+      Serial.println("Button held down");
+    }
+    else if (macroLen <= 0) {
+      Serial.println("Button pressed, but macro is empty");
+      macro_is_playing = true;
+    } 
+    else {
+      Serial.println("Button pressed, playing macro");
+      macro_is_playing = true;
+      play_macro();
+    }
+  }
+  else {
+    macro_is_playing = false;
+  }
 }
 
 //------------- Core1 -------------//
@@ -87,6 +102,29 @@ void loop1() {
   USBHost.task();
 }
 #endif
+
+// Macro playback: Send all recorded reports to PC in order
+void play_macro() {
+  for (size_t i = 0; i < macroLen; ++i) {
+    while (!usb_hid.ready()) {
+      yield();
+    }
+    usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
+    delay(15); // 66hz, 400wpm
+  }
+  macroLen = 0; // Clear the macro buffer after playback
+  Serial.println("Macro playback finished and buffer cleared.");
+}
+
+// Save the received keyboard report to macro buffer
+void save_to_macro(const hid_keyboard_report_t *report) {
+  if (macroLen < MACRO_BUFFER_SIZE) {
+    macroBuffer[macroLen++] = *report;
+    Serial.printf("Macro step %d saved.\r\n", macroLen);
+  } else {
+    Serial.println("Macro buffer full, cannot save more steps.");
+  }
+}
 
 //--------------------------------------------------------------------+
 // TinyUSB Host callbacks
@@ -120,40 +158,23 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 // Invoked when device with hid interface is un-mounted
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
   Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+  macroLen = 0;
 }
 
-void remap_key(hid_keyboard_report_t const *original_report, hid_keyboard_report_t *remapped_report) {
-  memcpy(remapped_report, original_report, sizeof(hid_keyboard_report_t));
-
-  // only remap if not empty report i.e key released
-  for (uint8_t i = 0; i < 6; i++) {
-    if (remapped_report->keycode[i] != 0) {
-      // Note: we ignore right shift here
-      remapped_report->modifier ^= KEYBOARD_MODIFIER_LEFTSHIFT;
-      break;
-    }
-  }
-}
-
-// Invoked when received report from device via interrupt endpoint
+// --- When HID report is received (save as macro step) ---
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
   if (len != 8) {
     Serial.printf("report len = %u NOT 8, probably something wrong !!\r\n", len);
   } else {
-    hid_keyboard_report_t remapped_report;
-    remap_key((hid_keyboard_report_t const *) report, &remapped_report);
-
-    // send remapped report to PC
-    // NOTE: for better performance you should save/queue remapped report instead of
-    // blocking wait for usb_hid ready here
+    save_to_macro((hid_keyboard_report_t const *)report);
+    // Optional: print contents of the report here for debugging
     while (!usb_hid.ready()) {
       yield();
     }
-
-    usb_hid.sendReport(0, &remapped_report, sizeof(hid_keyboard_report_t));
+    usb_hid.sendReport(0, report, sizeof(hid_keyboard_report_t));
   }
 
-  // continue to request to receive report
+  // Continue to request the next report as before...
   if (!tuh_hid_receive_report(dev_addr, instance)) {
     Serial.printf("Error: cannot request to receive report\r\n");
   }
