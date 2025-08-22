@@ -12,24 +12,8 @@
 #ifndef USBH_HELPER_H
 #define USBH_HELPER_H
 
-#ifdef ARDUINO_ARCH_RP2040
-  // pio-usb is required for rp2040 host
-  #include "pio_usb.h"
-
-  // Pin D+ for host, D- = D+ + 1
-  // #ifndef PIN_USB_HOST_DP
-  // #define PIN_USB_HOST_DP  12  // defined in pin_setup_helper.h
-  // #endif
-
-  // Pin for enabling Host VBUS. comment out if not used
-  // #ifndef PIN_5V_EN
-  // #define PIN_5V_EN        18
-  // #endif
-
-  // #ifndef PIN_5V_EN_STATE
-  // #define PIN_5V_EN_STATE  1
-  // #endif
-#endif // ARDUINO_ARCH_RP2040
+// pio-usb is required for rp2040 host
+#include "pio_usb.h"
 
 #include "Adafruit_TinyUSB.h"
 
@@ -38,8 +22,6 @@ Adafruit_USBH_Host USBHost;
 //--------------------------------------------------------------------+
 // Helper Functions
 //--------------------------------------------------------------------+
-
-#ifdef ARDUINO_ARCH_RP2040
 static void rp2040_configure_pio_usb(void) {
   //while ( !Serial ) delay(10);   // wait for native usb
   Serial.print("Core1 setup to run TinyUSB host with pio-usb\r\n");
@@ -62,6 +44,5 @@ static void rp2040_configure_pio_usb(void) {
 
   USBHost.configure_pio_usb(1, &pio_cfg);
 }
-#endif
 
 #endif

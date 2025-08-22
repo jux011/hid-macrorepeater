@@ -1,4 +1,6 @@
 
+static_assert(ARDUINO_ARCH_RP2040);
+
 #define PIN_BUTTON_OUT 10
 #define PIN_BUTTON_IN 11
 #define PIN_SWITCH1_LED 29
