@@ -33,9 +33,9 @@ bool macro_is_playing = false;
 bool macro_is_recording = false;
 
 // -------- Input Setup --------
-unsigned long lastToggleTime = 0;
-int ledState = LOW;
-const unsigned long debounceDelay = 50;
+unsigned long last_toggle_time = 0;
+int led_state = LOW;
+const unsigned long debounce_delay = 50;
 const int PIN_IN[4] = {PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN};
 unsigned long lastDebounceTimes[4] = {0,0,0,0};
 bool lastSwitchStates[4] = {LOW, LOW, LOW, LOW};
@@ -49,6 +49,10 @@ bool should_save_to_macro(bool* booleanStates) {
 
 bool should_send_passthrough(bool* booleanStates) {
   return booleanStates[2] == LOW || booleanStates[1] == LOW;
+}
+
+bool should_power_led_on(bool* booleanStates) {
+  return booleanStates[1] == HIGH;
 }
 
 //------------- Core0 -------------//
@@ -73,7 +77,7 @@ void loop() {
       lastSwitchStates[i] = reading;
     }
 
-    if (((millis() - lastDebounceTimes[i]) > debounceDelay)
+    if (((millis() - lastDebounceTimes[i]) > debounce_delay)
         && (reading != switchStates[i])) {
       switchStates[i] = reading;
     }
@@ -120,6 +124,11 @@ void loop() {
         undo_clear_macro();
       }
     }
+  }
+
+  if (should_power_led_on(switchStates) != led_state) {
+    led_state = should_power_led_on(switchStates);
+    digitalWrite(PIN_SWITCH1_LED, led_state);
   }
 }
 
