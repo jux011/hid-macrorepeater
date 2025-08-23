@@ -1,6 +1,6 @@
 #include "RP2040_Slow_PWM.h"
 
-#define HW_TIMER_INTERVAL_US  10000L  // minimum period of ISR_PWM, in microseconds
+#define HW_TIMER_FREQ  10.0f  // base frequency of ISR_PWM
 volatile uint64_t startMicros = 0;
 
 RP2040_Timer ITimer(3);  // timer 0 occupied running usbh, use another
@@ -16,10 +16,8 @@ bool TimerHandler(struct repeating_timer *t) {
 }
 
 void init_pwm() {
-  if (ITimer.attachInterruptInterval(HW_TIMER_INTERVAL_US, TimerHandler)) {
-    startMicros = micros();
-    Serial.print(F("Starting ITimer OK, micros() = "));
-    Serial.println(startMicros);
+  if (ITimer.attachInterrupt(HW_TIMER_FREQ, TimerHandler)) {
+    Serial.print(F("Starting ITimer OK"));
   } else {
     Serial.println(F("Can't set ITimer. Select another freq. or timer"));
   }
