@@ -14,25 +14,25 @@ static_assert(ARDUINO_ARCH_RP2040);
 // #define PIN_USB_HOST_DPMINUS 13 // implicit
 
 static void set_pinMode() {
-  pinMode(PIN_BUTTON_IN, INPUT);
+  pinMode(PIN_BUTTON_IN, INPUT_PULLDOWN);
   pinMode(PIN_BUTTON_OUT, OUTPUT);
 
   pinMode(PIN_SWITCH1_LED, OUTPUT);
   digitalWrite(PIN_SWITCH1_LED, LOW);
 
-  pinMode(PIN_SWITCH1_IN, INPUT);
-  // pinMode(PIN_SWITCH1_OUT, OUTPUT);
-  // digitalWrite(PIN_SWITCH1_OUT, HIGH); Switch 1 is wired to 3.3V directly
+  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN);
+  // pinMode(PIN_SWITCH1_OUT, OUTPUT); // Switch 1 is wired to 3.3V directly
 
-  pinMode(PIN_SWITCH2_IN, INPUT);
+  pinMode(PIN_SWITCH2_IN, INPUT_PULLDOWN);
   pinMode(PIN_SWITCH2_OUT, OUTPUT);
 
-  pinMode(PIN_SWITCH3_IN, INPUT);
+  pinMode(PIN_SWITCH3_IN, INPUT_PULLDOWN);
   pinMode(PIN_SWITCH3_OUT, OUTPUT);
 }
 
 static void set_output_poweron() {
   digitalWrite(PIN_BUTTON_OUT, HIGH);
+  // digitalWrite(PIN_SWITCH1_OUT, HIGH); // Switch 1 is wired to 3.3V directly
   digitalWrite(PIN_SWITCH2_OUT, HIGH);
   digitalWrite(PIN_SWITCH3_OUT, HIGH);
 }
