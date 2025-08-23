@@ -1,9 +1,6 @@
 #include "RP2040_Slow_PWM.h"
 
-#define USING_PWM_FREQUENCY false
-#define USING_MICROS_RESOLUTION false
-
-#define HW_TIMER_INTERVAL_US  20L
+#define HW_TIMER_INTERVAL_US  10000L  // minimum period of ISR_PWM, in microseconds
 volatile uint64_t startMicros = 0;
 
 RP2040_Timer ITimer(3);  // timer 0 occupied running usbh, use another
