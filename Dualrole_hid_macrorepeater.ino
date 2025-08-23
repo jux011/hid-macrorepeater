@@ -52,7 +52,7 @@ bool should_send_passthrough(bool* booleanStates) {
 }
 
 bool should_power_led_on(bool* booleanStates) {
-  return booleanStates[1] == HIGH;
+  return booleanStates[1] == HIGH && macro_len < MACRO_BUFFER_SIZE;
 }
 
 //------------- Core0 -------------//
