@@ -33,7 +33,6 @@ bool macro_is_playing = false;
 bool macro_is_recording = false;
 
 // -------- Input Setup --------
-unsigned long last_toggle_time = 0;
 int led_state = LOW;
 const unsigned long debounce_delay = 50;
 const int PIN_IN[4] = {PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN};
@@ -126,9 +125,13 @@ void loop() {
     }
   }
 
-  if (should_power_led_on(switchStates) != led_state) {
-    led_state = should_power_led_on(switchStates);
-    digitalWrite(PIN_SWITCH1_LED, led_state);
+  if (should_power_led_on(switchStates) && !led_state) {
+    led_state = HIGH;
+    set_led_blinking(600,50.0);    
+  }
+  else if (!should_power_led_on(switchStates) && led_state) {
+    led_state = LOW;
+    set_led_off();
   }
 }
 
