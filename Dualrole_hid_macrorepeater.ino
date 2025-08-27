@@ -25,7 +25,7 @@ uint8_t const desc_hid_report[] = {
 Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
 
 // -------- Macro Buffer --------
-#define MACRO_BUFFER_SIZE 250
+#define MACRO_BUFFER_SIZE 1000
 hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
 size_t macro_len = 0;
 size_t old_macro_len = 0;
