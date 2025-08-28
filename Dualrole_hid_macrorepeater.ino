@@ -9,7 +9,7 @@
  any redistribution
 *********************************************************************/
 
-#define PRINT_SERIAL_DELAY 1
+#define PRINT_SERIAL_DELAY 2000
 
 #include "pin_setup_helper.h"
 
@@ -18,7 +18,7 @@
 // HID report descriptor using TinyUSB's template
 // Single Report (no ID) descriptor
 uint8_t const desc_hid_report[] = {
-    TUD_HID_REPORT_DESC_KEYBOARD()
+  TUD_HID_REPORT_DESC_KEYBOARD()
 };
 
 // USB HID object: desc report, desc len, protocol, interval, use out endpoint
@@ -36,22 +36,22 @@ bool macro_is_recording = false;
 unsigned long last_toggle_time = 0;
 int led_state = LOW;
 const unsigned long debounce_delay = 50;
-const int PIN_IN[4] = {PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN};
-unsigned long lastDebounceTimes[4] = {0,0,0,0};
-bool lastSwitchStates[4] = {LOW, LOW, LOW, LOW};
-bool switchStates[4] = {LOW, LOW, LOW, LOW};
-bool sent_message[4] = {false, false, false, false}; // verbose input state reporting
+const int PIN_IN[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
+unsigned long lastDebounceTimes[4] = { 0, 0, 0, 0 };
+bool lastSwitchStates[4] = { LOW, LOW, LOW, LOW };
+bool switchStates[4] = { LOW, LOW, LOW, LOW };
+bool sent_message[4] = { false, false, false, false };  // verbose input state reporting
 
 // -------- Switch logic --------
-bool should_save_to_macro(bool* booleanStates) {
-  return booleanStates[1]; //== HIGH;
+bool should_save_to_macro(bool *booleanStates) {
+  return booleanStates[1];  //== HIGH;
 }
 
-bool should_send_passthrough(bool* booleanStates) {
+bool should_send_passthrough(bool *booleanStates) {
   return booleanStates[2] == LOW || booleanStates[1] == LOW;
 }
 
-bool should_power_led_on(bool* booleanStates) {
+bool should_power_led_on(bool *booleanStates) {
   return booleanStates[1] == HIGH && macro_len < MACRO_BUFFER_SIZE;
 }
 
@@ -63,9 +63,13 @@ void setup() {
   usb_hid.begin();
 
 #if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
-  while ( !Serial ) delay(10);   // wait for native usb
-  Serial.print("TinyUSB Macro Recorder Example\r\n");
+  // wait for native usb
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
 #endif
+  Serial.print("TinyUSB Macro Recorder Example\r\n");
 }
 
 void loop() {
@@ -135,7 +139,11 @@ void loop() {
 //------------- Core1 -------------//
 void setup1() {
 #if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
-  while ( !Serial ) delay(10);   // wait for native usb
+  // wait for native usb
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
 #endif
   // configure pio-usb: defined in usbh_helper.h
   rp2040_configure_pio_usb();
@@ -175,7 +183,7 @@ void clear_macro() {
 void undo_clear_macro() {
   macro_len = old_macro_len;
   // old_macro_len = 0;
-  Serial.printf("Macro reset to %u.\r\n",macro_len);
+  Serial.printf("Macro reset to %u.\r\n", macro_len);
 }
 
 // Save the received keyboard report to macro buffer
