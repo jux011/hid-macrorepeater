@@ -27,6 +27,8 @@ Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROT
 // -------- Macro Buffer --------
 #define MACRO_BUFFER_SIZE 1000
 hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
+unsigned long delayBuffer[MACRO_BUFFER_SIZE];
+// unsigned long *macro_starttime = &delayBuffer[0];
 size_t macro_len = 0;
 size_t old_macro_len = 0;
 bool macro_is_playing = false;
@@ -34,7 +36,7 @@ bool macro_is_recording = false;
 
 // -------- Input Setup --------
 unsigned long last_toggle_time = 0;
-int led_state = LOW;
+bool led_state = LOW;
 const unsigned long debounce_delay = 50;
 const int PIN_IN[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
 unsigned long lastDebounceTimes[4] = { 0, 0, 0, 0 };
@@ -106,7 +108,10 @@ void loop() {
       macro_is_playing = true;
       if (macro_len > 0) {
         Serial.println("Button pressed, playing macro.");
-        play_macro();
+        // hardcoded LED ON
+        led_state = true;
+        digitalWrite(PIN_SWITCH1_LED, HIGH);
+        play_macro(); // this is a delay() blocking call
         // if ()
       } else {
         Serial.println("Button pressed, but macro is empty.");
@@ -162,14 +167,16 @@ void loop1() {
 //------------- Macro -------------//
 // Macro playback: Send all recorded reports to PC in order
 void play_macro() {
-  for (size_t i = 0; i < macro_len; ++i) {
-    while (!usb_hid.ready()) {
-      yield();
-    }
+  while (!usb_hid.ready()) { yield(); }
+  usb_hid.sendReport(0, &macroBuffer[0], sizeof(hid_keyboard_report_t));
+  for (size_t i = 1; i < macro_len; ++i) {
+    delay(delayBuffer[i]);
+    while (!usb_hid.ready()) { yield(); }
+    // delay(15);  // 66hz, 400wpm
     usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
-    delay(15);  // 66hz, 400wpm
   }
   const uint8_t null_report[8] = { 0 };
+  while (!usb_hid.ready()) { yield(); }
   usb_hid.sendReport(0, null_report, sizeof(hid_keyboard_report_t));
   Serial.println("Macro playback finished.");
 }
@@ -188,8 +195,18 @@ void undo_clear_macro() {
 
 // Save the received keyboard report to macro buffer
 void save_to_macro(const hid_keyboard_report_t *report) {
-  if (macro_len < MACRO_BUFFER_SIZE) {
-    macroBuffer[macro_len++] = *report;
+  unsigned long now = millis();
+  if (macro_len == 0) {
+    macroBuffer[0] = *report;
+    delayBuffer[0] = now;
+    macro_len = 1;
+    Serial.printf("Macro started, macro starttime: %u\r\n", delayBuffer[0]);
+  }
+  else if (macro_len < MACRO_BUFFER_SIZE) {
+    macroBuffer[macro_len] = *report;
+    delayBuffer[macro_len] = now - delayBuffer[0];
+    delayBuffer[0] = now;
+    macro_len++;
     Serial.printf("Macro step %d saved.\r\n", macro_len);
   } else {
     Serial.println("Macro buffer full, cannot save more steps.");
