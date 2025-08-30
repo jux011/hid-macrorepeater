@@ -57,6 +57,10 @@ bool should_power_led_on(bool *booleanStates) {
   return booleanStates[1] == HIGH && macro_len < MACRO_BUFFER_SIZE;
 }
 
+bool should_delay(bool *booleanStates) {
+  return booleanStates[3];
+}
+
 //------------- Core0 -------------//
 void setup() {
   Serial.begin(115200);
@@ -169,11 +173,19 @@ void loop1() {
 void play_macro() {
   while (!usb_hid.ready()) { yield(); }
   usb_hid.sendReport(0, &macroBuffer[0], sizeof(hid_keyboard_report_t));
-  for (size_t i = 1; i < macro_len; ++i) {
-    delay(delayBuffer[i]);
-    while (!usb_hid.ready()) { yield(); }
-    // delay(15);  // 66hz, 400wpm
-    usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
+  if (should_delay(switchStates)) {
+    for (size_t i = 1; i < macro_len; ++i) {
+      delay(delayBuffer[i]);
+      while (!usb_hid.ready()) { yield(); }
+      usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
+    }
+  }
+  else {
+    for (size_t i = 1; i < macro_len; ++i) {
+      delay(15);  // 66hz, 400wpm
+      while (!usb_hid.ready()) { yield(); }
+      usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
+    }
   }
   const uint8_t null_report[8] = { 0 };
   while (!usb_hid.ready()) { yield(); }
