@@ -115,7 +115,7 @@ void loop() {
         // hardcoded LED ON
         led_state = true;
         digitalWrite(PIN_SWITCH1_LED, HIGH);
-        play_macro(); // this is a delay() blocking call
+        play_macro();  // this is a delay() blocking call
         // if ()
       } else {
         Serial.println("Button pressed, but macro is empty.");
@@ -179,8 +179,7 @@ void play_macro() {
       while (!usb_hid.ready()) { yield(); }
       usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
     }
-  }
-  else {
+  } else {
     for (size_t i = 1; i < macro_len; ++i) {
       delay(15);  // 66hz, 400wpm
       while (!usb_hid.ready()) { yield(); }
@@ -213,8 +212,7 @@ void save_to_macro(const hid_keyboard_report_t *report) {
     delayBuffer[0] = now;
     macro_len = 1;
     Serial.printf("Macro started, macro starttime: %u\r\n", delayBuffer[0]);
-  }
-  else if (macro_len < MACRO_BUFFER_SIZE) {
+  } else if (macro_len < MACRO_BUFFER_SIZE) {
     macroBuffer[macro_len] = *report;
     delayBuffer[macro_len] = now - delayBuffer[0];
     delayBuffer[0] = now;
