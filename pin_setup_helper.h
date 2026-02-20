@@ -11,7 +11,7 @@ static_assert(ARDUINO_ARCH_RP2040);
 #define PIN_SWITCH3_OUT 15
 #define PIN_SWITCH3_IN 14
 #define PIN_USB_HOST_DP 12
-// #define PIN_USB_HOST_DPMINUS 13 // implicit
+// #define PIN_USB_HOST_DM 13 // implicit
 
 static void set_pinMode() {
   pinMode(PIN_BUTTON_IN, INPUT_PULLDOWN);
@@ -37,5 +37,5 @@ static void set_output_poweron() {
   digitalWrite(PIN_SWITCH3_OUT, HIGH);
 }
 
-// set_pinmode();
+// set_pinMode();
 // set_output_poweron();

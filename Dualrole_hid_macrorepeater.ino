@@ -9,7 +9,7 @@
  any redistribution
 *********************************************************************/
 
-#define PRINT_SERIAL_DELAY 2000
+#define PRINT_SERIAL_DELAY 2000  // milliseconds
 
 #include "pin_setup_helper.h"
 
@@ -169,6 +169,8 @@ void loop1() {
 }
 
 //------------- Macro -------------//
+const uint8_t null_report[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
 // Macro playback: Send all recorded reports to PC in order
 void play_macro() {
   while (!usb_hid.ready()) { yield(); }
@@ -186,7 +188,6 @@ void play_macro() {
       usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
     }
   }
-  const uint8_t null_report[8] = { 0 };
   while (!usb_hid.ready()) { yield(); }
   usb_hid.sendReport(0, null_report, sizeof(hid_keyboard_report_t));
   Serial.println("Macro playback finished.");
