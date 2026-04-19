@@ -10,4 +10,8 @@ Raspberry Pi Pico Arduino core
 TinyUSB device, TinyUSB host  
 adapted from Adafruit/DualRole/HID/hid_remapper script  
 
-target hardware: rp2040 dev board with 10 digital gpio pins  
+target hardware:
+waveshare rp2040-pizero with pio-usb + 15 gpio
+12 cherry mx keys 
+12 2182 leds
+i2c lcd 1602

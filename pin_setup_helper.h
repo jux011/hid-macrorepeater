@@ -1,6 +1,7 @@
 
 static_assert(ARDUINO_ARCH_RP2040);
 
+// TODO: redesignate pins
 #define PIN_BUTTON_OUT 10
 #define PIN_BUTTON_IN 11
 #define PIN_SWITCH1_LED 29
@@ -10,8 +11,8 @@ static_assert(ARDUINO_ARCH_RP2040);
 #define PIN_SWITCH2_IN 26
 #define PIN_SWITCH3_OUT 15
 #define PIN_SWITCH3_IN 14
-#define PIN_USB_HOST_DP 12
-// #define PIN_USB_HOST_DM 13 // implicit
+#define PIN_USB_HOST_DP 6
+// #define PIN_USB_HOST_DM 7 // implicit
 
 static void set_pinMode() {
   pinMode(PIN_BUTTON_IN, INPUT_PULLDOWN);
