@@ -1,41 +1,33 @@
 
 static_assert(ARDUINO_ARCH_RP2040);
 
-// TODO: redesignate pins
-#define PIN_BUTTON_OUT 10
-#define PIN_BUTTON_IN 11
-#define PIN_SWITCH1_LED 29
-// #define PIN_SWITCH1_OUT 999
-#define PIN_SWITCH1_IN 28
-#define PIN_SWITCH2_OUT 27
-#define PIN_SWITCH2_IN 26
-#define PIN_SWITCH3_OUT 15
-#define PIN_SWITCH3_IN 14
+#define PIN_BUTTON1_IN 21
+#define PIN_BUTTON2_IN 20
+#define PIN_BUTTON3_IN 16
+
+#define PIN_JOYSTICK_UP_IN 9 // no longer 6
+#define PIN_JOYSTICK_DOWN_IN 19
+#define PIN_JOYSTICK_LEFT_IN 5
+#define PIN_JOYSTICK_RIGHT_IN 26
+#define PIN_JOYSTICK_PRESS_IN 13
+
 #define PIN_USB_HOST_DP 6
 // #define PIN_USB_HOST_DM 7 // implicit
 
 static void set_pinMode() {
-  pinMode(PIN_BUTTON_IN, INPUT_PULLDOWN);
-  pinMode(PIN_BUTTON_OUT, OUTPUT);
+  pinMode(PIN_BUTTON1_IN, INPUT_PULLUP);
+  pinMode(PIN_BUTTON2_IN, INPUT_PULLUP);
+  pinMode(PIN_BUTTON3_IN, INPUT_PULLUP);
 
-  pinMode(PIN_SWITCH1_LED, OUTPUT);
-  digitalWrite(PIN_SWITCH1_LED, LOW);
-
-  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN);
-  // pinMode(PIN_SWITCH1_OUT, OUTPUT); // Switch 1 is wired to 3.3V directly
-
-  pinMode(PIN_SWITCH2_IN, INPUT_PULLDOWN);
-  pinMode(PIN_SWITCH2_OUT, OUTPUT);
-
-  pinMode(PIN_SWITCH3_IN, INPUT_PULLDOWN);
-  pinMode(PIN_SWITCH3_OUT, OUTPUT);
+  pinMode(PIN_JOYSTICK_UP_IN, INPUT_PULLUP);
+  pinMode(PIN_JOYSTICK_DOWN_IN, INPUT_PULLUP);
+  pinMode(PIN_JOYSTICK_LEFT_IN, INPUT_PULLUP);
+  pinMode(PIN_JOYSTICK_RIGHT_IN, INPUT_PULLUP);
+  pinMode(PIN_JOYSTICK_PRESS_IN, INPUT_PULLUP);
 }
 
 static void set_output_poweron() {
-  digitalWrite(PIN_BUTTON_OUT, HIGH);
-  // digitalWrite(PIN_SWITCH1_OUT, HIGH); // Switch 1 is wired to 3.3V directly
-  digitalWrite(PIN_SWITCH2_OUT, HIGH);
-  digitalWrite(PIN_SWITCH3_OUT, HIGH);
+  // buttons are open-high closed-ground
 }
 
 // set_pinMode();

@@ -33,39 +33,36 @@ size_t macro_len = 0;
 size_t old_macro_len = 0;
 bool macro_is_playing = false;
 bool macro_is_recording = false;
+bool delay_on = true;
 
 // -------- Input Setup --------
 unsigned long last_toggle_time = 0;
-bool led_state = LOW;
 const unsigned long debounce_delay = 50;
-const int PIN_IN[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
+const int PIN_IN[4] = { PIN_BUTTON1_IN, PIN_BUTTON2_IN, PIN_BUTTON3_IN, PIN_JOYSTICK_PRESS_IN};
 unsigned long lastDebounceTimes[4] = { 0, 0, 0, 0 };
-bool lastSwitchStates[4] = { LOW, LOW, LOW, LOW };
-bool switchStates[4] = { LOW, LOW, LOW, LOW };
-bool sent_message[4] = { false, false, false, false };  // verbose input state reporting
+bool lastSwitchStates[4] = { HIGH, HIGH, HIGH, HIGH };
+bool switchStates[4] = { HIGH, HIGH, HIGH, HIGH };
+int buttonPresses[4] = { 0, 0, 0, 0 };
 
 // -------- Switch logic --------
 bool should_save_to_macro(bool *booleanStates) {
-  return booleanStates[1];  //== HIGH;
+  return macro_is_recording;
 }
 
 bool should_send_passthrough(bool *booleanStates) {
-  return booleanStates[2] == LOW || booleanStates[1] == LOW;
-}
-
-bool should_power_led_on(bool *booleanStates) {
-  return booleanStates[1] == HIGH && macro_len < MACRO_BUFFER_SIZE;
+  return !macro_is_playing;
 }
 
 bool should_delay(bool *booleanStates) {
-  return booleanStates[3];
+  return delay_on;
 }
 
 //------------- Core0 -------------//
 void setup() {
   Serial.begin(115200);
+  // Serial1.begin(115200);
   set_pinMode();
-  set_output_poweron();
+  // set_output_poweron();
   usb_hid.begin();
 
 #if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
@@ -78,43 +75,44 @@ void setup() {
   Serial.print("TinyUSB Macro Recorder Example\r\n");
 }
 
+unsigned long now_timestamp = 0;
+
 void loop() {
-  const unsigned long now_timestamp = millis();
-  for (int i = 0; i < 4; i++) {
+  now_timestamp = millis();
+  for (int i = 0; i < 3; i++) {
     bool reading = digitalRead(PIN_IN[i]);
     if (reading != lastSwitchStates[i]) {
       lastDebounceTimes[i] = now_timestamp;
       lastSwitchStates[i] = reading;
     }
 
-    if (((millis() - lastDebounceTimes[i]) > debounce_delay)
-        && (reading != switchStates[i])) {
+    if (((now_timestamp - lastDebounceTimes[i]) > debounce_delay)
+        && (lastSwitchStates[i] != switchStates[i])) {
       switchStates[i] = reading;
-    }
-  }
-
-  for (int i = 0; i < 4; i++) {  // verbose input state reporting
-    if (switchStates[i] == HIGH) {
-      if (!sent_message[i]) {
-        Serial.printf("switch %u on\r\n", i);
-        sent_message[i] = true;
+      if (switchStates[i] == LOW) {
+        buttonPresses[i]++;
       }
-    } else {
-      sent_message[i] = false;
     }
   }
 
-  if (switchStates[0] == HIGH) {
-    // if (macro_is_playing) {
-    //   Serial.println("Button held down");
-    // }
+  if (buttonPresses[2] % 2) {
+    if (delay_on != false) {
+      Serial.println("delay off");
+      delay_on = false;
+    }
+  }
+  else {
+    if (delay_on != true) {
+      Serial.println("delay on");
+      delay_on = true;
+    }
+  }
+
+  if (switchStates[1] == LOW) {
     if (!macro_is_playing) {
       macro_is_playing = true;
       if (macro_len > 0) {
         Serial.println("Button pressed, playing macro.");
-        // hardcoded LED ON
-        led_state = true;
-        digitalWrite(PIN_SWITCH1_LED, HIGH);
         play_macro();  // this is a delay() blocking call
         // if ()
       } else {
@@ -125,23 +123,21 @@ void loop() {
     macro_is_playing = false;
   }
 
-  if (switchStates[1] == HIGH) {
+
+  if (buttonPresses[0] % 2) {
     if (!macro_is_recording) {
       macro_is_recording = true;
       clear_macro();
+      Serial.println("Button pressed, recording macro.");
     }
   } else {
     if (macro_is_recording) {
       macro_is_recording = false;
+      Serial.println("Button pressed, end recording.");
       if (macro_len <= 0) {
         undo_clear_macro();
       }
     }
-  }
-
-  if (should_power_led_on(switchStates) != led_state) {
-    led_state = should_power_led_on(switchStates);
-    digitalWrite(PIN_SWITCH1_LED, led_state);
   }
 }
 
