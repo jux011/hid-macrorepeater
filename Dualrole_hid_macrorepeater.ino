@@ -9,7 +9,7 @@
  any redistribution
 *********************************************************************/
 
-#define PRINT_SERIAL_DELAY 2000  // milliseconds
+#define PRINT_SERIAL_DELAY 500  // milliseconds
 
 #include "pin_setup_helper.h"
 
