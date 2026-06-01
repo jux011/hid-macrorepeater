@@ -1,4 +1,4 @@
-
+// waveshare pizero with gamepi hat
 static_assert(ARDUINO_ARCH_RP2040);
 
 #define PIN_BUTTON1_IN 21
@@ -27,7 +27,7 @@ static void set_pinMode() {
 }
 
 static void set_output_poweron() {
-  // buttons are open-high closed-ground
+  // all 8 buttons are open-pullup closed-ground
 }
 
 // set_pinMode();
