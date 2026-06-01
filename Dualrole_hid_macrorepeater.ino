@@ -263,6 +263,9 @@ extern "C" {
         save_to_macro((hid_keyboard_report_t const *)report);
       }
 
+      // send remapped report to PC
+      // NOTE: for better performance you should save/queue remapped report instead of
+      // blocking wait for usb_hid ready here
       if (should_send_passthrough(switchStates)) {
         while (!usb_hid.ready()) { yield(); }
         usb_hid.sendReport(0, report, sizeof(hid_keyboard_report_t));
