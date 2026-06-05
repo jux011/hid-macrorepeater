@@ -1,0 +1,240 @@
+/*********************************************************************
+ Adafruit invests time and resources providing this open source code,
+ please support Adafruit and open-source hardware by purchasing
+ products from Adafruit!
+
+ MIT license, check LICENSE for more information
+ Copyright (c) 2019 Ha Thach for Adafruit Industries
+ All text above, and the splash screen below must be included in
+ any redistribution
+*********************************************************************/
+
+/* This example demonstrates use of both device and host, where
+ * - Device run on native usb controller (roothub port0)
+ * - Host depending on MCUs run on either:
+ *   - rp2040: bit-banging 2 GPIOs with the help of Pico-PIO-USB library (roothub port1)
+ *
+ * Requirements:
+ * - For rp2040:
+ *   - [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB) library
+ *   - 2 consecutive GPIOs: D+ is defined by PIN_USB_HOST_DP, D- = D+ +1
+ *   - Provide VBus (5v) and GND for peripheral
+ *   - CPU Speed must be either 120 or 240 Mhz. Selected via "Menu -> CPU Speed"
+ */
+
+#define PRINT_SERIAL_DELAY 2000  // milliseconds
+
+#include "pin_setup_helper.h"
+
+// USBHost is defined in usbh_helper.h
+#include "usbh_helper.h"
+
+// #include "usbh_extension.ino"  // inclusion is automatic
+
+// Report ID
+enum {
+  RID_KEYBOARD = 1,
+  RID_MOUSE = 2,
+  RID_CONSUMER_CONTROL = 3,  // Media, volume etc ...
+};
+
+// HID report descriptor using TinyUSB's template
+uint8_t const desc_hid_report[] = {
+  TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD)),
+  TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(RID_MOUSE)),
+  TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(RID_CONSUMER_CONTROL))
+};
+
+// valid values can be found in enum{} on line 897
+// of Adafruit_TinyUSB_Library\src\class\hid\usages.h
+static uint16_t consumer_keys_list[6] = {
+  HID_USAGE_CONSUMER_SCAN_PREVIOUS_TRACK,
+  HID_USAGE_CONSUMER_PLAY_PAUSE,
+  HID_USAGE_CONSUMER_SCAN_NEXT_TRACK,
+  HID_USAGE_CONSUMER_MUTE,
+  HID_USAGE_CONSUMER_VOLUME_DECREMENT,
+  HID_USAGE_CONSUMER_VOLUME_INCREMENT,
+};
+
+// USB HID object
+Adafruit_USBD_HID usb_hid;
+
+//--------------------------------------------------------------------+
+// For RP2040 use both core0 for device stack, core1 for host stack
+//--------------------------------------------------------------------+
+
+//------------- Core0 -------------//
+void setup() {
+  Serial.begin(115200);
+
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  // wait for native usb
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
+#endif
+
+  usb_hid.setPollInterval(2);  // milliseconds
+  usb_hid.setReportDescriptor(desc_hid_report, sizeof(desc_hid_report));
+  usb_hid.setStringDescriptor("TinyUSB HID Composite\n");
+  usb_hid.begin();
+
+  if (TinyUSBDevice.mounted()) {
+    TinyUSBDevice.detach();
+    delay(10);
+    TinyUSBDevice.attach();
+  }
+
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  // wait for native usb again
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
+#endif
+
+  Serial.println("TinyUSB Host Composite HID Remap Example\n");
+}
+
+void loop() {
+  // nothing to do
+}
+
+//------------- Core1 -------------//
+void setup1() {
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  // wait for native usb
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
+#endif
+  // configure pio-usb: defined in usbh_helper.h
+  rp2040_configure_pio_usb();
+
+  tuh_init_consumer_settings(consumer_keys_list, 6);
+
+  // run host stack on controller (rhport) 1
+  // Note: For rp2040 pico-pio-usb, calling USBHost.begin() on core1 will have most of the
+  // host bit-banging processing works done in core1 to free up core0 for other works
+  USBHost.begin(1);
+}
+
+void loop1() {
+  USBHost.task();
+}
+
+//--------------------------------------------------------------------+
+// TinyUSB Host callbacks
+//--------------------------------------------------------------------+
+extern "C" {
+
+  // Invoked when device with hid interface is mounted
+  // Report descriptor is also available for use.
+  // tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
+  // descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
+  // it will be skipped therefore report_desc = NULL, desc_len = 0
+  void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len) {
+    (void)desc_report;
+    (void)desc_len;
+    uint16_t vid, pid;
+    tuh_vid_pid_get(dev_addr, &vid, &pid);
+
+    Serial.printf("HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
+    Serial.printf("VID = %04x, PID = %04x\r\n", vid, pid);
+
+    uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+    if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
+      Serial.printf("HID Keyboard\r\n");
+      if (!tuh_hid_receive_report(dev_addr, instance)) {
+        Serial.printf("Error: cannot request to receive report\r\n");
+      }
+      return;
+    }
+
+    tuh_hid_report_info_t info;
+    uint16_t consumer_page_start, consumer_page_end;
+    bool found = tuh_hid_get_consumer_page(
+      &info, &consumer_page_start, &consumer_page_end,
+      desc_report, desc_len);
+    if (!found) {
+      // Serial.printf("this instance is not a keyboard protocol");
+      return;
+    }
+
+    Serial.printf("HID Consumer Control\r\n");
+    bool success = tuh_compute_consumer_page_values(
+      desc_report, consumer_page_start, consumer_page_end,
+      instance, info.report_id);
+    if (!success) {
+      Serial.printf("Error: cannot compute report_size, instance, report_id, \r\n");
+      return;
+    }
+
+    if (!tuh_hid_receive_report(dev_addr, instance)) {
+      Serial.printf("Error: cannot request to receive report\r\n");
+    }
+    return;
+  }
+
+  // Invoked when device with hid interface is un-mounted
+  void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
+    Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+    if (instance == get_tuh_consumer_instance()) {
+      tuh_init_consumer_settings();
+    }
+  }
+
+  void remap_key(uint8_t* const remapped_id, hid_keyboard_report_t* remapped_report, const hid_keyboard_report_t* original_report) {
+    // do nothing lmao
+    *remapped_id = RID_KEYBOARD;
+    memcpy(remapped_report, original_report, sizeof(hid_keyboard_report_t));
+  }
+
+  void remap_consumer_key(uint8_t* const remapped_id, uint16_t* remapped_report, const uint16_t original_report) {
+    // do nothing lmao
+    *remapped_id = RID_CONSUMER_CONTROL;
+    *remapped_report = original_report;
+  }
+
+  // Invoked when received report from device via interrupt endpoint
+  void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
+    if (instance == 0) {  // boot keyboard
+                          // Serial.printf("Received report from instance %d, len = %u\r\n", instance, len);
+      hid_keyboard_report_t report_to_send;
+      uint8_t target_id;
+      remap_key(&target_id, &report_to_send, (const hid_keyboard_report_t*)report);
+
+      // send remapped report to PC
+      // NOTE: for better performance you should save/queue remapped report instead of
+      // blocking wait for usb_hid ready here
+      while (!usb_hid.ready()) {
+        yield();
+      }
+
+      usb_hid.sendReport(target_id, &report_to_send, sizeof(report_to_send));
+    } else if (instance == get_tuh_consumer_instance()) {
+      // Serial.printf("Received report from consumer control instance %d, len = %u\r\n", instance, len);
+      uint16_t report_consumer_key = tuh_process_consumer_report(report, len);
+      uint16_t report_to_send = 0;
+      uint8_t target_id;
+      remap_consumer_key(&target_id, &report_to_send, report_consumer_key);
+
+      // send remapped report to PC
+      // NOTE: for better performance you should save/queue remapped report instead of
+      // blocking wait for usb_hid ready here
+      while (!usb_hid.ready()) {
+        yield();
+      }
+      usb_hid.sendReport(target_id, &report_to_send, sizeof(report_to_send));
+    } else {
+      Serial.printf("Received report from unknown instance %d, len = %u\r\n", instance, len);
+    }
+
+    // continue to request to receive report
+    if (!tuh_hid_receive_report(dev_addr, instance)) {
+      Serial.printf("Error: cannot request to receive report\r\n");
+    }
+  }
+}

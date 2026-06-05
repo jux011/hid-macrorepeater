@@ -31,10 +31,10 @@ static void set_pinMode() {
 }
 
 static void set_output_poweron() {
-  digitalWrite(PIN_BUTTON_OUT, HIGH);
-  // digitalWrite(PIN_SWITCH1_OUT, HIGH); // Switch 1 is wired to 3.3V directly
-  digitalWrite(PIN_SWITCH2_OUT, HIGH);
-  digitalWrite(PIN_SWITCH3_OUT, HIGH);
+  // digitalWrite(PIN_BUTTON_OUT, HIGH);
+  // // digitalWrite(PIN_SWITCH1_OUT, HIGH); // Switch 1 is wired to 3.3V directly
+  // digitalWrite(PIN_SWITCH2_OUT, HIGH);
+  // digitalWrite(PIN_SWITCH3_OUT, HIGH);
 }
 
 // set_pinMode();
