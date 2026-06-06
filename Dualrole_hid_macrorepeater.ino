@@ -94,7 +94,7 @@ void setup() {
   }
 #endif
 
-  Serial.println("TinyUSB Host Composite HID Remap Example\n");
+  Serial.println("TinyUSB Macro Recorder Example");
 }
 
 void loop() {
