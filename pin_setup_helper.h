@@ -15,19 +15,23 @@ static_assert(ARDUINO_ARCH_RP2040);
 // #define PIN_USB_HOST_DM 7 // implicit
 
 static void set_pinMode() {
-  pinMode(PIN_BUTTON1_IN, INPUT_PULLUP);
-  pinMode(PIN_BUTTON2_IN, INPUT_PULLUP);
-  pinMode(PIN_BUTTON3_IN, INPUT_PULLUP);
+  // SimRacingController configures buttons as  open INPUT_PULLUP, closed LOW
+  // this matches the hardware exactly
+  // no need to manually set pinMode or digitalWrite HIGH
+  // pinMode(PIN_BUTTON1_IN, INPUT_PULLUP);
+  // pinMode(PIN_BUTTON2_IN, INPUT_PULLUP);
+  // pinMode(PIN_BUTTON3_IN, INPUT_PULLUP);
 
-  pinMode(PIN_JOYSTICK_UP_IN, INPUT_PULLUP);
-  pinMode(PIN_JOYSTICK_DOWN_IN, INPUT_PULLUP);
-  pinMode(PIN_JOYSTICK_LEFT_IN, INPUT_PULLUP);
-  pinMode(PIN_JOYSTICK_RIGHT_IN, INPUT_PULLUP);
-  pinMode(PIN_JOYSTICK_PRESS_IN, INPUT_PULLUP);
+  // pinMode(PIN_JOYSTICK_UP_IN, INPUT_PULLUP);
+  // pinMode(PIN_JOYSTICK_DOWN_IN, INPUT_PULLUP);
+  // pinMode(PIN_JOYSTICK_LEFT_IN, INPUT_PULLUP);
+  // pinMode(PIN_JOYSTICK_RIGHT_IN, INPUT_PULLUP);
+  // pinMode(PIN_JOYSTICK_PRESS_IN, INPUT_PULLUP);
 }
 
 static void set_output_poweron() {
-  // all 8 buttons are open-pullup closed-ground
+  // all buttons are open INPUT_PULLUP, closed LOW
+  // no need to digitalWrite
 }
 
 // set_pinMode();

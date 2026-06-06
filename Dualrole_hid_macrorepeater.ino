@@ -9,184 +9,100 @@
  any redistribution
 *********************************************************************/
 
+/* This example demonstrates use of both device and host, where
+ * - Device run on native usb controller (roothub port0)
+ * - Host depending on MCUs run on either:
+ *   - rp2040: bit-banging 2 GPIOs with the help of Pico-PIO-USB library (roothub port1)
+ *
+ * Requirements:
+ * - For rp2040:
+ *   - [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB) library
+ *   - 2 consecutive GPIOs: D+ is defined by PIN_USB_HOST_DP, D- = D+ +1
+ *   - Provide VBus (5v) and GND for peripheral
+ *   - CPU Speed must be either 120 or 240 Mhz. Selected via "Menu -> CPU Speed"
+ */
+
 #define PRINT_SERIAL_DELAY 2000  // milliseconds
 
 #include "pin_setup_helper.h"
+#include <SimRacingController.h>
 
+// USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
 
-// HID report descriptor using TinyUSB's template
-// Single Report (no ID) descriptor
-uint8_t const desc_hid_report[] = {
-  TUD_HID_REPORT_DESC_KEYBOARD()
+// #include "usbh_extension.ino"  // inclusion is automatic
+
+
+//------------- TinyUSB HID Globals -------------//
+
+// Report ID
+enum {
+  RID_KEYBOARD = 1,
+  RID_MOUSE = 2,
+  RID_CONSUMER_CONTROL = 3,  // Media, volume etc ...
 };
 
-// USB HID object: desc report, desc len, protocol, interval, use out endpoint
-Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
+// HID report descriptor using TinyUSB's template
+uint8_t const desc_hid_report[] = {
+  TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD)),
+  TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(RID_MOUSE)),
+  TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(RID_CONSUMER_CONTROL))
+};
 
-// -------- Macro Buffer --------
+// valid values can be found in enum{} on line 897
+// of Adafruit_TinyUSB_Library\src\class\hid\usages.h
+static uint16_t consumer_keys_list[6] = {
+  HID_USAGE_CONSUMER_SCAN_PREVIOUS_TRACK,
+  HID_USAGE_CONSUMER_PLAY_PAUSE,
+  HID_USAGE_CONSUMER_SCAN_NEXT_TRACK,
+  HID_USAGE_CONSUMER_MUTE,
+  HID_USAGE_CONSUMER_VOLUME_DECREMENT,
+  HID_USAGE_CONSUMER_VOLUME_INCREMENT,
+};
+
+// USB HID object
+Adafruit_USBD_HID usb_hid;
+
+
+//------------- Macro Globals -------------//
+SimRacingController switchBoard;
+// initialize as if all switches are open
+static bool is_recording = false;
+static bool is_playing = false;
+static bool is_passthrough_on = true; // passthrough by default
+static bool is_delay_on = false;
+
 #define MACRO_BUFFER_SIZE 1000
-hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
-unsigned long delayBuffer[MACRO_BUFFER_SIZE];
+static hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
+static unsigned long delayBuffer[MACRO_BUFFER_SIZE];
 // unsigned long *macro_starttime = &delayBuffer[0];
-size_t macro_len = 0;
-size_t old_macro_len = 0;
-bool macro_is_playing = false;
-bool macro_is_recording = false;
-bool delay_on = true;
+static size_t macro_len = 0;
+static size_t old_macro_len = 0;
 
-// -------- Input Setup --------
-unsigned long last_toggle_time = 0;
-const unsigned long debounce_delay = 50;
-const int PIN_IN[4] = { PIN_BUTTON1_IN, PIN_BUTTON2_IN, PIN_BUTTON3_IN, PIN_JOYSTICK_PRESS_IN};
-unsigned long lastDebounceTimes[4] = { 0, 0, 0, 0 };
-bool lastSwitchStates[4] = { HIGH, HIGH, HIGH, HIGH };
-bool switchStates[4] = { HIGH, HIGH, HIGH, HIGH };
-int buttonPresses[4] = { 0, 0, 0, 0 };
 
-// -------- Switch logic --------
-bool should_save_to_macro(bool *booleanStates) {
-  return macro_is_recording;
+//------------- Macro Implementation -------------//
+static const hid_keyboard_report_t null_report = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+void usb_hid_send_my_rid_keyboard_report(const hid_keyboard_report_t this_report[]) {
+  while (!usb_hid.ready()) { yield(); }
+  usb_hid.sendReport(RID_KEYBOARD, this_report, sizeof(hid_keyboard_report_t));
 }
-
-bool should_send_passthrough(bool *booleanStates) {
-  return !macro_is_playing;
-}
-
-bool should_delay(bool *booleanStates) {
-  return delay_on;
-}
-
-//------------- Core0 -------------//
-void setup() {
-  Serial.begin(115200);
-  // Serial1.begin(115200);
-  set_pinMode();
-  // set_output_poweron();
-  usb_hid.begin();
-
-#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
-  // wait for native usb
-  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
-    if (Serial) { break; }
-    delay(10);
-  }
-#endif
-  Serial.print("TinyUSB Macro Recorder Example\r\n");
-}
-
-unsigned long now_timestamp = 0;
-
-void loop() {
-  now_timestamp = millis();
-  for (int i = 0; i < 3; i++) {
-    bool reading = digitalRead(PIN_IN[i]);
-    if (reading != lastSwitchStates[i]) {
-      lastDebounceTimes[i] = now_timestamp;
-      lastSwitchStates[i] = reading;
-    }
-
-    if (((now_timestamp - lastDebounceTimes[i]) > debounce_delay)
-        && (lastSwitchStates[i] != switchStates[i])) {
-      switchStates[i] = reading;
-      if (switchStates[i] == LOW) {
-        buttonPresses[i]++;
-      }
-    }
-  }
-
-  if (buttonPresses[2] % 2) {
-    if (delay_on != false) {
-      Serial.println("delay off");
-      delay_on = false;
-    }
-  }
-  else {
-    if (delay_on != true) {
-      Serial.println("delay on");
-      delay_on = true;
-    }
-  }
-
-  if (switchStates[1] == LOW) {
-    if (!macro_is_playing) {
-      macro_is_playing = true;
-      if (macro_len > 0) {
-        Serial.println("Button pressed, playing macro.");
-        play_macro();  // this is a delay() blocking call
-        // if ()
-      } else {
-        Serial.println("Button pressed, but macro is empty.");
-      }
-    }
-  } else {
-    macro_is_playing = false;
-  }
-
-
-  if (buttonPresses[0] % 2) {
-    if (!macro_is_recording) {
-      macro_is_recording = true;
-      clear_macro();
-      Serial.println("Button pressed, recording macro.");
-    }
-  } else {
-    if (macro_is_recording) {
-      macro_is_recording = false;
-      Serial.println("Button pressed, end recording.");
-      if (macro_len <= 0) {
-        undo_clear_macro();
-      }
-    }
-  }
-}
-
-//------------- Core1 -------------//
-void setup1() {
-#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
-  // wait for native usb
-  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
-    if (Serial) { break; }
-    delay(10);
-  }
-#endif
-  // configure pio-usb: defined in usbh_helper.h
-  rp2040_configure_pio_usb();
-
-  // run host stack on controller (rhport) 1
-  // Note: For rp2040 pico-pio-usb, calling USBHost.begin() on core1 will have most of the
-  // host bit-banging processing works done in core1 to free up core0 for other works
-  USBHost.begin(1);
-}
-
-void loop1() {
-  USBHost.task();
-  Serial.flush();
-}
-
-//------------- Macro -------------//
-const uint8_t null_report[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 // Macro playback: Send all recorded reports to PC in order
 void play_macro() {
-  while (!usb_hid.ready()) { yield(); }
-  usb_hid.sendReport(0, &macroBuffer[0], sizeof(hid_keyboard_report_t));
-  if (should_delay(switchStates)) {
+  usb_hid_send_my_rid_keyboard_report(&macroBuffer[0]);
+  if (should_delay()) {
     for (size_t i = 1; i < macro_len; ++i) {
       delay(delayBuffer[i]);
-      while (!usb_hid.ready()) { yield(); }
-      usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
+      usb_hid_send_my_rid_keyboard_report(&macroBuffer[i]);
     }
   } else {
     for (size_t i = 1; i < macro_len; ++i) {
       delay(15);  // 66hz, 400wpm
-      while (!usb_hid.ready()) { yield(); }
-      usb_hid.sendReport(0, &macroBuffer[i], sizeof(hid_keyboard_report_t));
+      usb_hid_send_my_rid_keyboard_report(&macroBuffer[i]);
     }
   }
-  while (!usb_hid.ready()) { yield(); }
-  usb_hid.sendReport(0, null_report, sizeof(hid_keyboard_report_t));
-  Serial.println("Macro playback finished.");
+  usb_hid_send_my_rid_keyboard_report(&null_report);
 }
 
 void clear_macro() {
@@ -202,7 +118,7 @@ void undo_clear_macro() {
 }
 
 // Save the received keyboard report to macro buffer
-void save_to_macro(const hid_keyboard_report_t *report) {
+void save_to_macro(const hid_keyboard_report_t report[]) {
   unsigned long now = millis();
   if (macro_len == 0) {
     macroBuffer[0] = *report;
@@ -220,13 +136,171 @@ void save_to_macro(const hid_keyboard_report_t *report) {
   }
 }
 
-// -------------------------------------------------------------------------
+
+//------------- Switch Logic -------------//
+bool should_save_to_macro() {
+  return is_recording && !is_playing;
+}
+
+bool should_send_passthrough() {
+  return !is_playing && (is_passthrough_on || !is_recording);
+}
+
+bool should_delay() {
+  return is_delay_on;
+}
+
+
+//------------- Switch Implementation -------------//
+enum gpio_i {
+  BUTTON_IN = 0,
+  SWITCH1_IN = 1,
+  SWITCH2_IN = 2,
+  SWITCH3_IN = 3,
+};
+
+static const int gpioPins[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
+
+void onGpioChange(int profile, int gpio, bool is_pressed) {
+  // Serial.printf("onGpioChange %d %d %d\n", profile, gpio, is_pressed);
+  switch (gpio) {
+
+    case BUTTON_IN:
+      if (is_pressed && !is_playing) {
+        if (macro_len > 0) {
+          is_playing = true;
+          Serial.println("Macro playback start.");
+          play_macro();
+          Serial.println("Macro playback finished.");
+          is_playing = false;
+        } else {
+          Serial.println("Macro empty.");
+        }
+      }
+      break;
+
+    case SWITCH1_IN:
+      // open: off, INPUT_PULLDOWN, is_pressed = true, is_recording = false
+      // closed: on, HIGH, is_pressed = false, is_recording = true
+      is_recording = !is_pressed;
+      digitalWrite(PIN_SWITCH1_LED, is_recording);
+      if (is_recording) {
+        clear_macro();
+        Serial.println("Button pressed, recording macro.");
+      } else if (macro_len <= 0) {
+        undo_clear_macro();
+      }
+      break;
+
+    case SWITCH2_IN:
+      // open: off, INPUT_PULLUP, is_pressed = false, is_passthrough_on = true
+      // closed: on, LOW, is_pressed = true, is_passthrough_on = false
+      is_passthrough_on = !is_pressed;
+      break;
+
+    case SWITCH3_IN:
+      // open: off, INPUT_PULLUP, is_pressed = false, is_delay_on = false
+      // closed: on, LOW, is_pressed = true, is_delay_on = true
+      is_delay_on = is_pressed;
+      break;
+  }
+}
+
+
+//--------------------------------------------------------------------+
+// For RP2040 use both core0 for device stack, core1 for host stack
+//--------------------------------------------------------------------+
+
+
+//------------- Core0 -------------//
+void setup() {
+  Serial.begin(115200);
+
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  // wait for native usb
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
+#endif
+
+  usb_hid.setPollInterval(2);  // milliseconds
+  usb_hid.setReportDescriptor(desc_hid_report, sizeof(desc_hid_report));
+  usb_hid.setStringDescriptor("TinyUSB HID Composite\n");
+  usb_hid.begin();
+
+  if (TinyUSBDevice.mounted()) {
+    TinyUSBDevice.detach();
+    delay(10);
+    TinyUSBDevice.attach();
+  }
+
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  // wait for native usb again
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
+#endif
+
+  // switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
+  switchBoard.setGpio(gpioPins, 4);
+  // switchBoard.setEncoders(encoderPinsA, encoderPinsB, encoderBtnPins, NUM_ENCODERS);
+  switchBoard.setProfiles(1);
+  switchBoard.setDebounceTime(50, 5);  // matrix/gpio=50ms, encoder=5ms
+
+  switchBoard.setGpioCallback(onGpioChange);
+
+  set_pinMode();
+  set_output_poweron();
+  switchBoard.begin();
+  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN);
+
+  Serial.println("TinyUSB Macro Recorder Example");
+}
+
+void loop() {
+  switchBoard.update();
+}
+
+
+//------------- Core1 -------------//
+void setup1() {
+#if defined(PRINT_SERIAL_DELAY) && PRINT_SERIAL_DELAY
+  // wait for native usb
+  for (int i = 0; i < PRINT_SERIAL_DELAY; i += 10) {
+    if (Serial) { break; }
+    delay(10);
+  }
+#endif
+  // configure pio-usb: defined in usbh_helper.h
+  rp2040_configure_pio_usb();
+
+  tuh_init_consumer_settings(consumer_keys_list, 6);
+
+  // run host stack on controller (rhport) 1
+  // Note: For rp2040 pico-pio-usb, calling USBHost.begin() on core1 will have most of the
+  // host bit-banging processing works done in core1 to free up core0 for other works
+  USBHost.begin(1);
+}
+
+void loop1() {
+  USBHost.task();
+  Serial.flush();
+}
+
+
+//--------------------------------------------------------------------+
 // TinyUSB Host callbacks
-// -------------------------------------------------------------------------
+//--------------------------------------------------------------------+
 extern "C" {
 
-  // --- When HID device (like keyboard) is mounted ---
-  void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_report, uint16_t desc_len) {
+  // Invoked when device with hid interface is mounted
+  // Report descriptor is also available for use.
+  // tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
+  // descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
+  // it will be skipped therefore report_desc = NULL, desc_len = 0
+  void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len) {
     (void)desc_report;
     (void)desc_len;
     uint16_t vid, pid;
@@ -241,34 +315,75 @@ extern "C" {
       if (!tuh_hid_receive_report(dev_addr, instance)) {
         Serial.printf("Error: cannot request to receive report\r\n");
       }
+      return;
     }
+
+    tuh_hid_report_info_t info;
+    uint16_t consumer_page_start, consumer_page_end;
+    bool found = tuh_hid_get_consumer_page(
+      &info, &consumer_page_start, &consumer_page_end,
+      desc_report, desc_len);
+    if (!found) {
+      // Serial.printf("this instance is not a keyboard protocol");
+      return;
+    }
+
+    Serial.printf("HID Consumer Control\r\n");
+    bool success = tuh_compute_consumer_page_values(
+      desc_report, consumer_page_start, consumer_page_end,
+      instance, info.report_id);
+    if (!success) {
+      Serial.printf("Error: cannot compute report_size, instance, report_id, \r\n");
+      return;
+    }
+
+    if (!tuh_hid_receive_report(dev_addr, instance)) {
+      Serial.printf("Error: cannot request to receive report\r\n");
+    }
+    return;
   }
 
-  // --- When HID device is unmounted ---
+  // Invoked when device with hid interface is un-mounted
   void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
     Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+    if (instance == get_tuh_consumer_instance()) {
+      tuh_init_consumer_settings();
+    }
     clear_macro();
   }
 
-  // --- When HID report is received (save as macro step) ---
-  void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
-    if (len != 8) {
-      Serial.printf("report len = %u NOT 8, probably something wrong !!\r\n", len);
-    } else {
-      if (should_save_to_macro(switchStates)) {
-        save_to_macro((hid_keyboard_report_t const *)report);
+  // Invoked when received report from device via interrupt endpoint
+  void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
+    if (instance == 0) {  // boot keyboard
+                          // Serial.printf("Received report from instance %d, len = %u\r\n", instance, len);
+      if (len != 8) {
+        Serial.printf("report len = %u NOT 8, probably something wrong !!\r\n", len);
+      } else {
+        const hid_keyboard_report_t* boot_report = (const hid_keyboard_report_t*)report;
+        if (should_save_to_macro()) {
+          save_to_macro(boot_report);
+        }
+
+        if (should_send_passthrough()) {
+          usb_hid_send_my_rid_keyboard_report(boot_report);
+        }
       }
 
-      if (should_send_passthrough(switchStates)) {
-        while (!usb_hid.ready()) { yield(); }
-        usb_hid.sendReport(0, report, sizeof(hid_keyboard_report_t));
-      }
+    } else if (instance == get_tuh_consumer_instance()) {
+      // Serial.printf("Received report from consumer control instance %d, len = %u\r\n", instance, len);
+      uint16_t report_consumer_key = tuh_process_consumer_report(report, len);
+
+      // NOTE: for better performance you should save/queue remapped report instead of
+      // blocking wait for usb_hid ready here
+      while (!usb_hid.ready()) { yield(); }
+      usb_hid.sendReport(RID_CONSUMER_CONTROL, &report_consumer_key, sizeof(report_consumer_key));
+    } else {
+      Serial.printf("Received report from unknown instance %d, len = %u\r\n", instance, len);
     }
 
-    // Continue to request the next report as before...
+    // continue to request to receive report
     if (!tuh_hid_receive_report(dev_addr, instance)) {
       Serial.printf("Error: cannot request to receive report\r\n");
     }
   }
-
-}  // extern "C"
+}
