@@ -24,7 +24,7 @@
 
 #define PRINT_SERIAL_DELAY 2000  // milliseconds
 
-#include "pin_setup_helper.h"
+#include "mySimRacingController.h"
 
 // USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
