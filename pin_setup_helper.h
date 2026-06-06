@@ -24,7 +24,7 @@ static void set_pinMode() {
   pinMode(PIN_SWITCH1_LED, OUTPUT);
   digitalWrite(PIN_SWITCH1_LED, LOW);
 
-  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN); // This will be overridden by SimRacingController
+  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN);  // This will be overridden by SimRacingController
   // pinMode(PIN_SWITCH1_OUT, OUTPUT); // Switch 1 is wired to 3.3V directly
 
   pinMode(PIN_SWITCH2_IN, INPUT_PULLUP);

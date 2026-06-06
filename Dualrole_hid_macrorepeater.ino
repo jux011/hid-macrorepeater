@@ -66,9 +66,10 @@ Adafruit_USBD_HID usb_hid;
 
 //------------- Macro Globals -------------//
 SimRacingController switchBoard;
+// initialize as if all switches are open
 static bool is_recording = false;
 static bool is_playing = false;
-static bool is_passthrough_on = false;
+static bool is_passthrough_on = true; // passthrough by default
 static bool is_delay_on = false;
 
 #define MACRO_BUFFER_SIZE 1000
@@ -161,6 +162,7 @@ enum gpio_i {
 static const int gpioPins[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
 
 void onGpioChange(int profile, int gpio, bool is_pressed) {
+  // Serial.printf("onGpioChange %d %d %d\n", profile, gpio, is_pressed);
   switch (gpio) {
 
     case BUTTON_IN:
