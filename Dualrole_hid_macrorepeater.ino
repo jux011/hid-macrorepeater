@@ -24,12 +24,76 @@
 
 #define PRINT_SERIAL_DELAY 2000  // milliseconds
 
-#include "mySimRacingController.h"
+#include "pin_setup_helper.h"
+#include <SimRacingController.h>
 
 // USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
 
 // #include "usbh_extension.ino"  // inclusion is automatic
+
+
+//------------- Macro Globals -------------//
+SimRacingController switchBoard;
+static bool is_recording = false;
+static bool is_playing = false;
+static bool is_passthrough_on = false;
+static bool is_delay_on = false;
+
+#define MACRO_BUFFER_SIZE 1000
+hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
+unsigned long delayBuffer[MACRO_BUFFER_SIZE];
+// unsigned long *macro_starttime = &delayBuffer[0];
+size_t macro_len = 0;
+size_t old_macro_len = 0;
+
+
+//------------- Switch Logic -------------//
+bool should_save_to_macro(bool* booleanStates) {
+  return is_recording && !is_playing;
+}
+
+bool should_send_passthrough(bool* booleanStates) {
+  return is_passthrough_on && !is_playing;
+}
+
+bool should_delay(bool* booleanStates) {
+  return is_delay_on;
+}
+
+enum gpio_i {
+  BUTTON_IN = 0,
+  SWITCH1_IN = 1,
+  SWITCH2_IN = 2,
+  SWITCH3_IN = 3,
+};
+
+static const int gpioPins[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
+
+void onGpioChange(int profile, int gpio, bool is_pressed) {
+  Serial.println("sign of life");
+  switch (gpio) {
+    case BUTTON_IN:
+      if (is_pressed) {
+        is_playing = true;
+        Serial.println("GDSJHKGFFDSKFKDS");
+        is_playing = false;
+      }
+      break;
+    case SWITCH1_IN:
+      is_recording = !is_pressed; // note switch1 is reversed
+      break;
+    case SWITCH2_IN:
+      is_passthrough_on = is_pressed;
+      break;
+    case SWITCH3_IN:
+      is_delay_on = is_pressed;
+      break;
+  }
+}
+
+
+//------------- TinyUSB HID Globals -------------//
 
 // Report ID
 enum {
@@ -59,9 +123,11 @@ static uint16_t consumer_keys_list[6] = {
 // USB HID object
 Adafruit_USBD_HID usb_hid;
 
+
 //--------------------------------------------------------------------+
 // For RP2040 use both core0 for device stack, core1 for host stack
 //--------------------------------------------------------------------+
+
 
 //------------- Core0 -------------//
 void setup() {
@@ -94,12 +160,26 @@ void setup() {
   }
 #endif
 
+  // switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
+  switchBoard.setGpio(gpioPins, 4);
+  // switchBoard.setEncoders(encoderPinsA, encoderPinsB, encoderBtnPins, NUM_ENCODERS);
+  switchBoard.setProfiles(1);
+  switchBoard.setDebounceTime(50, 5);  // matrix/gpio=50ms, encoder=5ms
+
+  switchBoard.setGpioCallback(onGpioChange);
+
+  set_pinMode();
+  set_output_poweron();
+  switchBoard.begin();
+  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN);
+  
   Serial.println("TinyUSB Macro Recorder Example");
 }
 
 void loop() {
-  // nothing to do
+  switchBoard.update();
 }
+
 
 //------------- Core1 -------------//
 void setup1() {
@@ -124,6 +204,7 @@ void setup1() {
 void loop1() {
   USBHost.task();
 }
+
 
 //--------------------------------------------------------------------+
 // TinyUSB Host callbacks
