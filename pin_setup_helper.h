@@ -7,7 +7,7 @@ static_assert(ARDUINO_ARCH_RP2040);
 
 #define PIN_JOYSTICK_UP_IN 9 // no longer 6
 #define PIN_JOYSTICK_DOWN_IN 19
-#define PIN_JOYSTICK_LEFT_IN 5
+#define PIN_JOYSTICK_LEFT_IN 15
 #define PIN_JOYSTICK_RIGHT_IN 26
 #define PIN_JOYSTICK_PRESS_IN 13
 
@@ -31,7 +31,7 @@ static void set_pinMode() {
 
 static void set_output_poweron() {
   // all buttons are open INPUT_PULLUP, closed LOW
-  // no need to digitalWrite
+  // nothing to poweron
 }
 
 // set_pinMode();
