@@ -151,83 +151,45 @@ bool should_delay() {
 
 
 //------------- Switch Implementation -------------//
-enum gpio_i {
-  BUTTON1_IN = 0,
-  BUTTON2_IN = 1,
-  BUTTON3_IN = 2,
-  JOYSTICK_UP_IN = 3,
-  JOYSTICK_DOWN_IN = 4,
-  JOYSTICK_LEFT_IN = 5,
-  JOYSTICK_RIGHT_IN = 6,
-  JOYSTICK_PRESS_IN = 7,
-};
-
-static const int gpioPins[8] = {
-  PIN_BUTTON1_IN,
-  PIN_BUTTON2_IN,
-  PIN_BUTTON3_IN,
-  PIN_JOYSTICK_UP_IN,
-  PIN_JOYSTICK_DOWN_IN,
-  PIN_JOYSTICK_LEFT_IN,
-  PIN_JOYSTICK_RIGHT_IN,
-  PIN_JOYSTICK_PRESS_IN,
-};
+const int MATRIX_ROWS = 2;
+const int MATRIX_COLS = 5;
+const int rowPins[MATRIX_ROWS] = {PIN_KEYPAD_R1, PIN_KEYPAD_R2};
+const int colPins[MATRIX_COLS] = {PIN_KEYPAD_C1, PIN_KEYPAD_C2, PIN_KEYPAD_C3, PIN_KEYPAD_C4, PIN_KEYPAD_C5};
 
 SimRacingController switchBoard;
 
-void onGpioChange(int profile, int gpio, bool is_pressed) {
-  Serial.printf("onGpioChange %d %d %d\r\n", profile, gpio, is_pressed);
-  switch (gpio) {
-
-    case BUTTON2_IN:
-      // on press: start playback
-      // on release: nothing
-      if (is_pressed && !is_playing) {
-        if (macro_len > 0) {
-          is_playing = true;
-          Serial.println("Macro playback start.");
-          play_macro();
-          Serial.println("Macro playback finished.");
-          is_playing = false;
-        } else {
-          Serial.println("Macro empty.");
-        }
-      }
-      break;
-
-    case BUTTON1_IN:
-      // on press1: start recording
-      // on press2: stop recording
-      // on release: nothing
-      if (is_pressed) {
-        is_recording = !is_recording;
-        if (is_recording) {
-          clear_macro();
-          Serial.println("Button pressed, recording macro.");
-        } else if (macro_len <= 0) {
-          Serial.println("Button pressed, nothing recorded.");
+void onMatrixChange(int profile, int row, int col, bool state) {
+  // row 0 col 0 play macro
+  if (row == 0 && col == 0) {
+    if (state) {
+      is_playing = true;
+      Serial.println("Macro playback started.");
+      play_macro();
+      is_playing = false;
+      Serial.println("Macro playback finished.");
+    }
+  }
+  // row 1 col 0 start/stop recording
+  else if (row == 1 && col == 0) {
+    if (state) {
+      if (is_recording) {
+        is_recording = false;
+        Serial.println("Macro recording stopped.");
+        if (macro_len == 0) {
+          Serial.println("No macro recorded.");
           undo_clear_macro();
-        } else {
-          Serial.println("Button pressed, stop recording.");
+        }
+      } else {
+        is_recording = true;
+        Serial.println("Macro recording started.");
+        if (macro_len > 0) {
+          Serial.printf("Overwriting existing macro of length %u.\r\n", macro_len);
+          clear_macro();
         }
       }
-      break;
-
-    case BUTTON3_IN:
-      // on press1: delay on
-      // on press2: delay off
-      // on release: nothing
-      if (is_pressed) {
-        is_delay_on = !is_delay_on;
-        Serial.printf("Delay %s\r\n", is_delay_on ? "on" : "off");
-      }
-      break;
-
-    default:
-      break;
+    }
   }
 }
-
 
 //--------------------------------------------------------------------+
 // For RP2040 use both core0 for device stack, core1 for host stack
@@ -265,16 +227,18 @@ void setup() {
   }
 #endif
 
-  // switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
-  switchBoard.setGpio(gpioPins, 8);
+  switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
+  // switchBoard.setGpio(gpioPins, 8);
   // switchBoard.setEncoders(encoderPinsA, encoderPinsB, encoderBtnPins, NUM_ENCODERS);
   switchBoard.setProfiles(1);
   switchBoard.setDebounceTime(50, 5);  // matrix/gpio=50ms, encoder=5ms
 
-  switchBoard.setGpioCallback(onGpioChange);
+  // Set callbacks
+  switchBoard.setMatrixCallback(onMatrixChange);
+  // switchBoard.setGpioCallback(onGpioChange);
+  // switchBoard.setEncoderCallback(onEncoderChange);
+  // switchBoard.setEncoderButtonCallback(onEncoderButtonChange);
 
-  set_pinMode();
-  set_output_poweron();
   switchBoard.begin();
 
   Serial.println("TinyUSB Macro Recorder Example");
