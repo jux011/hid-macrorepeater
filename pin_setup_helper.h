@@ -10,9 +10,13 @@ static_assert(ARDUINO_ARCH_RP2040);
 #define PIN_KEYPAD_C3 13
 #define PIN_KEYPAD_C4 12
 #define PIN_KEYPAD_C5 28
+
 #define PIN_KEYPAD_R1 29
 #define PIN_KEYPAD_R2 14
+
 #define PIN_KEYPAD_NEOPIXEL 26
+
+#define LED_COUNT 10
 
 #define PIN_USB_HOST_DP 6
 // #define PIN_USB_HOST_DM 7 // implicit

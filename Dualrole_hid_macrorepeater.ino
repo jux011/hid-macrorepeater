@@ -30,6 +30,9 @@
 // USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
 
+// neopixel must be included AFTER "pio_usb.h", in order to invoke pio2
+#include <Adafruit_NeoPixel.h>
+
 // #include "usbh_extension.ino"  // inclusion is automatic
 
 
@@ -158,10 +161,10 @@ const int colPins[MATRIX_COLS] = {PIN_KEYPAD_C1, PIN_KEYPAD_C2, PIN_KEYPAD_C3, P
 
 SimRacingController switchBoard;
 
-void onMatrixChange(int profile, int row, int col, bool state) {
+void onMatrixChange(int profile, int row, int col, bool is_pressed) {
   // row 0 col 0 play macro
   if (row == 0 && col == 0) {
-    if (state) {
+    if (is_pressed) {
       is_playing = true;
       Serial.println("Macro playback started.");
       play_macro();
@@ -171,7 +174,7 @@ void onMatrixChange(int profile, int row, int col, bool state) {
   }
   // row 1 col 0 start/stop recording
   else if (row == 1 && col == 0) {
-    if (state) {
+    if (is_pressed) {
       if (is_recording) {
         is_recording = false;
         Serial.println("Macro recording stopped.");
@@ -190,6 +193,67 @@ void onMatrixChange(int profile, int row, int col, bool state) {
     }
   }
 }
+
+
+//------------- Lights Globals -------------//
+// from "Adafruit Neopixel"/strandtest_nodelay.ino
+unsigned long pixelPrevious = 0;        // Previous Pixel Millis
+// unsigned long patternPrevious = 0;      // Previous Pattern Millis
+// int           patternCurrent = 0;       // Current Pattern Number
+// int           patternInterval = 5000;   // Pattern Interval (ms)
+// bool          patternComplete = false;
+
+int           pixelInterval = 50;       // Pixel Interval (ms)
+// int           pixelQueue = 0;           // Pattern Pixel Queue
+int           pixelCycle = 0;           // Pattern Pixel Cycle
+uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
+int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
+
+Adafruit_NeoPixel strip(LED_COUNT, PIN_KEYPAD_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+
+
+//------------- Lights Implementation -------------//
+void neoPixel_init() {
+  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
+  strip.show();            // Turn OFF all pixels ASAP
+  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
+}
+
+void neoPixel_update(unsigned long currentMillis) {
+  // unsigned long currentMillis = millis();                     //  Update current time
+
+  if(currentMillis - pixelPrevious >= pixelInterval) {        //  Check for expired time
+    pixelPrevious = currentMillis;                            //  Run current frame
+    rainbow(); // Flowing rainbow cycle along the whole strip
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+// Rainbow cycle along whole strip.
+void rainbow() {
+  for(uint16_t i=0; i < pixelNumber; i++) {
+    strip.setPixelColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255)); //  Update delay time
+  }
+  strip.show();                             //  Update strip to match
+  pixelCycle++;                             //  Advance current cycle
+  if(pixelCycle >= 256)
+    pixelCycle = 0;                         //  Loop the cycle back to the begining
+}
+
 
 //--------------------------------------------------------------------+
 // For RP2040 use both core0 for device stack, core1 for host stack
@@ -263,6 +327,8 @@ void setup1() {
 
   tuh_init_consumer_settings(consumer_keys_list, 6);
 
+  neoPixel_init();
+
   // run host stack on controller (rhport) 1
   // Note: For rp2040 pico-pio-usb, calling USBHost.begin() on core1 will have most of the
   // host bit-banging processing works done in core1 to free up core0 for other works
@@ -271,6 +337,7 @@ void setup1() {
 
 void loop1() {
   USBHost.task();
+  neoPixel_update(millis());
   Serial.flush();
 }
 
