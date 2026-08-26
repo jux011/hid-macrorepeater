@@ -176,56 +176,66 @@ void neoPixel_init() {
   strip.setBrightness(50); // Set BRIGHTNESS
 }
 
-void neoPixel_update(unsigned long currentMillis) {
-  // unsigned long currentMillis = millis();                     //  Update current time
+void neoPixel_update() {
+  if (patternComplete) {
+    return;
+  }
 
-  if(currentMillis - pixelPrevious >= pixelInterval) {        //  Check for expired time
-    pixelPrevious = currentMillis;                            //  Run current frame
-    // static patterns
-    if (!patternComplete) {
-      patternComplete = true;                                 //  Set pattern complete
-      switch (patternCurrent)
-      {
-        case RED:
-          set_all_color(strip.Color(128, 0, 0));
-          break;
-        case ORANGE:
-          set_all_color(strip.Color(128, 42, 0));
-          break;
-        case YELLOW:
-          set_all_color(strip.Color(128, 128, 0));
-          break;
-        case GREEN:
-          set_all_color(strip.Color(0, 128, 0));
-          break;
-        case BLUE:
-          set_all_color(strip.Color(0, 0, 128));
-          break;
-        case PURPLE:
-          set_all_color(strip.Color(64, 0, 128));
-          break;
-        case PINK:
-          set_all_color(strip.Color(128, 0, 64));
-          break;
-        case WHITE:
-          set_all_color(strip.Color(128, 128, 128));
-          break;
-        case OFF:
-          set_all_color(strip.Color(0, 0, 0));
-          break;
-        default:
-          patternComplete = false;  //  Reset pattern complete
-          break;
-      }
-    }
+  // check if it's time to update the pixels
+  unsigned long currentMillis = millis();
+  if(currentMillis - pixelPrevious < pixelInterval) {
+    return;
+  }
+  pixelPrevious = currentMillis;
+  //  Run current frame
+
+  // static patterns
+  switch (patternCurrent) {
+    case RED:
+      set_all_color(strip.Color(128, 0, 0));
+      patternComplete = true;
+      break;
+    case ORANGE:
+      set_all_color(strip.Color(128, 42, 0));
+      patternComplete = true;
+      break;
+    case YELLOW:
+      set_all_color(strip.Color(128, 128, 0));
+      patternComplete = true;
+      break;
+    case GREEN:
+      set_all_color(strip.Color(0, 128, 0));
+      patternComplete = true;
+      break;
+    case BLUE:
+      set_all_color(strip.Color(0, 0, 128));
+      patternComplete = true;
+      break;
+    case PURPLE:
+      set_all_color(strip.Color(64, 0, 128));
+      patternComplete = true;
+      break;
+    case PINK:
+      set_all_color(strip.Color(128, 0, 64));
+      patternComplete = true;
+      break;
+    case WHITE:
+      set_all_color(strip.Color(128, 128, 128));
+      patternComplete = true;
+      break;
+    case OFF:
+      set_all_color(strip.Color(0, 0, 0));
+      patternComplete = true;
+      break;
     // dynamic patterns
-    switch (patternCurrent) {
-      case RAINBOW_CYCLE:
-        rainbow(); // Flowing rainbow cycle along the whole strip
-        break;
-    }
+    case RAINBOW_CYCLE:
+      rainbow(); // Flowing rainbow cycle along the whole strip
+      // patternComplete = false;  // never complete
+      break;
   }
 }
+
+// from "Adafruit Neopixel"/strandtest_nodelay.ino
 
 // Input a value 0 to 255 to get a color value.
 // The colours are a transition r - g - b - back to r.
@@ -410,7 +420,7 @@ void setup1() {
 
 void loop1() {
   USBHost.task();
-  neoPixel_update(millis());
+  neoPixel_update();
   Serial.flush();
 }
 
