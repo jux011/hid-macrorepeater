@@ -166,23 +166,41 @@ int           pixelCycle = 0;           // Pattern Pixel Cycle
 uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
 int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
 
+int           pixelBrightness = 50;      // Pixel Brightness (0-255)
+
+unsigned long pixelOverrideDuration = 1000;  // milliseconds
+
+uint32_t  pixelOverrideColor[LED_COUNT] = {0};
+unsigned long pixelOverrideExpiry[LED_COUNT] = {0};
+
 Adafruit_NeoPixel strip(LED_COUNT, PIN_KEYPAD_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
+uint32_t  colorIndicateEnabled = strip.Color(0, 255, 0);
+uint32_t  colorIndicateDisabled = strip.Color(255, 0, 0);
+uint32_t  colorIndicateRecording = strip.Color(128, 0, 0);
 
 //------------- Lights Implementation -------------//
 void neoPixel_init() {
   strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
   strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(50); // Set BRIGHTNESS
+  strip.setBrightness(pixelBrightness); // Set BRIGHTNESS
 }
 
-void neoPixel_update() {
+void neoPixel_update(unsigned long currentMillis) {
+  for (int i = 0; i < LED_COUNT; i++) {
+    if (pixelOverrideExpiry[i] > 0 && currentMillis > pixelOverrideExpiry[i]) {
+      pixelOverrideColor[i] = 0;
+      pixelOverrideExpiry[i] = 0;
+      patternComplete = false;  // reset pattern complete
+    }
+  }
+
   if (patternComplete) {
     return;
   }
 
   // check if it's time to update the pixels
-  unsigned long currentMillis = millis();
+  // unsigned long currentMillis = millis();
   if(currentMillis - pixelPrevious < pixelInterval) {
     return;
   }
@@ -192,44 +210,44 @@ void neoPixel_update() {
   // static patterns
   switch (patternCurrent) {
     case RED:
-      set_all_color(strip.Color(128, 0, 0));
+      set_all_color(strip.Color(128, 0, 0), currentMillis);
       patternComplete = true;
       break;
     case ORANGE:
-      set_all_color(strip.Color(128, 42, 0));
+      set_all_color(strip.Color(128, 42, 0), currentMillis);
       patternComplete = true;
       break;
     case YELLOW:
-      set_all_color(strip.Color(128, 128, 0));
+      set_all_color(strip.Color(128, 128, 0), currentMillis);
       patternComplete = true;
       break;
     case GREEN:
-      set_all_color(strip.Color(0, 128, 0));
+      set_all_color(strip.Color(0, 128, 0), currentMillis);
       patternComplete = true;
       break;
     case BLUE:
-      set_all_color(strip.Color(0, 0, 128));
+      set_all_color(strip.Color(0, 0, 128), currentMillis);
       patternComplete = true;
       break;
     case PURPLE:
-      set_all_color(strip.Color(64, 0, 128));
+      set_all_color(strip.Color(64, 0, 128), currentMillis);
       patternComplete = true;
       break;
     case PINK:
-      set_all_color(strip.Color(128, 0, 64));
+      set_all_color(strip.Color(128, 0, 64), currentMillis);
       patternComplete = true;
       break;
     case WHITE:
-      set_all_color(strip.Color(128, 128, 128));
+      set_all_color(strip.Color(128, 128, 128), currentMillis);
       patternComplete = true;
       break;
     case OFF:
-      set_all_color(strip.Color(0, 0, 0));
+      set_all_color(strip.Color(0, 0, 0), currentMillis);
       patternComplete = true;
       break;
     // dynamic patterns
     case RAINBOW_CYCLE:
-      rainbow(); // Flowing rainbow cycle along the whole strip
+      rainbow(currentMillis); // Flowing rainbow cycle along the whole strip
       // patternComplete = false;  // never complete
       break;
   }
@@ -252,10 +270,42 @@ uint32_t Wheel(byte WheelPos) {
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
+void setOverrideColor(int pixelIndex, uint32_t color, unsigned long expiryTime=0xFFFFFFFFUL) {
+  if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
+    Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
+    return;
+  }
+  pixelOverrideColor[pixelIndex] = color;
+  pixelOverrideExpiry[pixelIndex] = expiryTime;
+  patternComplete = false;  // reset pattern complete
+}
+
+void clearOverrideColor(int pixelIndex) {
+  if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
+    Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
+    return;
+  }
+  pixelOverrideExpiry[pixelIndex] = 0;
+  patternComplete = false;  // reset pattern complete
+}
+
+void setLightColor(int pixelIndex, uint32_t color, unsigned long currentMillis) {
+  if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
+    Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
+    return;
+  }
+  if (pixelOverrideExpiry[pixelIndex] > 0 && currentMillis < pixelOverrideExpiry[pixelIndex]) {
+    strip.setPixelColor(pixelIndex, pixelOverrideColor[pixelIndex]);
+  }
+  else {
+    strip.setPixelColor(pixelIndex, color);
+  }
+}
+
 // Rainbow cycle along whole strip.
-void rainbow() {
+void rainbow(unsigned long currentMillis) {
   for(uint16_t i=0; i < pixelNumber; i++) {
-    strip.setPixelColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255)); //  Update delay time
+    setLightColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255), currentMillis); //  Update delay time
   }
   strip.show();                             //  Update strip to match
   pixelCycle++;                             //  Advance current cycle
@@ -263,9 +313,9 @@ void rainbow() {
     pixelCycle = 0;                         //  Loop the cycle back to the begining
 }
 
-void set_all_color(uint32_t color) {
+void set_all_color(uint32_t color, unsigned long currentMillis) {
   for(uint16_t i=0; i < pixelNumber; i++) {
-    strip.setPixelColor(i, color);
+    setLightColor(i, color, currentMillis);
   }
   strip.show();
 }
@@ -293,23 +343,42 @@ const int colPins[MATRIX_COLS] = {PIN_KEYPAD_C1, PIN_KEYPAD_C2, PIN_KEYPAD_C3, P
 
 SimRacingController switchBoard;
 
+int keyIndex(int row, int col) {
+  if (row < 0 || row >= MATRIX_ROWS || col < 0 || col >= MATRIX_COLS) {
+    Serial.printf("Invalid row %d or col %d, must be between 0 and %d, 0 and %d\r\n", row, col, MATRIX_ROWS - 1, MATRIX_COLS - 1);
+    return -1;
+  }
+  if (row == 1) {
+    // 0 1 2 3 4
+    return col;
+  } else if (row == 0) {
+    // 9 8 7 6 5
+    return MATRIX_COLS + (MATRIX_COLS - 1 - col);
+  }
+  return -1;  // should never reach here
+}
+
 void onMatrixChange(int profile, int row, int col, bool is_pressed) {
-  // row 0 col 0 play macro
-  if (row == 0 && col == 0) {
+  int key = keyIndex(row, col);
+  // key 9 play macro
+  if (key == 9) {
     if (is_pressed) {
       is_playing = true;
       Serial.println("Macro playback started.");
+      setOverrideColor(key, colorIndicateEnabled);
       play_macro();
       is_playing = false;
+      clearOverrideColor(key);
       Serial.println("Macro playback finished.");
     }
   }
-  // row 1 col 0 start/stop recording
-  else if (row == 1 && col == 0) {
+  // key 0 start/stop recording
+  else if (key == 0) {
     if (is_pressed) {
       if (is_recording) {
         is_recording = false;
         Serial.println("Macro recording stopped.");
+        clearOverrideColor(key);
         if (macro_len == 0) {
           Serial.println("No macro recorded.");
           undo_clear_macro();
@@ -317,6 +386,7 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
       } else {
         is_recording = true;
         Serial.println("Macro recording started.");
+        setOverrideColor(key, colorIndicateRecording);
         if (macro_len > 0) {
           Serial.printf("Overwriting existing macro of length %u.\r\n", macro_len);
           clear_macro();
@@ -324,8 +394,8 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
       }
     }
   }
-  // row 0 col 4 cycle light pattern
-  else if (row == 0 && col == 4) {
+  // key 5 cycle light pattern
+  else if (key == 5) {
     if (is_pressed) {
       patternCurrent++;
       if (patternCurrent > OFF) {
@@ -333,6 +403,14 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
       }
       patternComplete = false;  // reset pattern complete
       Serial.printf("Light pattern changed to %d.\r\n", patternCurrent);
+    }
+  }
+  // key 4 toggle delay on/off
+  else if (key == 4) {
+    if (is_pressed) {
+      is_delay_on = !is_delay_on;
+      setOverrideColor(key, is_delay_on ? colorIndicateEnabled : colorIndicateDisabled, millis() + pixelOverrideDuration);
+      Serial.printf("Delay %s.\r\n", is_delay_on ? "enabled" : "disabled");
     }
   }
 }
@@ -420,7 +498,7 @@ void setup1() {
 
 void loop1() {
   USBHost.task();
-  neoPixel_update();
+  neoPixel_update(millis());
   Serial.flush();
 }
 
