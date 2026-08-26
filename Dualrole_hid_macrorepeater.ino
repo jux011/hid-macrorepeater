@@ -139,6 +139,128 @@ void save_to_macro(const hid_keyboard_report_t report[]) {
 }
 
 
+//------------- Lights Globals -------------//
+enum pattern_lights {
+  RAINBOW_CYCLE = 0,
+  RED = 1,
+  ORANGE = 2,
+  YELLOW = 3,
+  GREEN = 4,
+  BLUE = 5,
+  PURPLE = 6,
+  PINK = 7,
+  WHITE = 8,
+  OFF = 9,
+};
+
+// from "Adafruit Neopixel"/strandtest_nodelay.ino
+unsigned long pixelPrevious = 0;        // Previous Pixel Millis
+// unsigned long patternPrevious = 0;      // Previous Pattern Millis
+int           patternCurrent = 0;       // Current Pattern Number
+// int           patternInterval = 5000;   // Pattern Interval (ms)
+bool          patternComplete = false;
+
+int           pixelInterval = 50;       // Pixel Interval (ms)
+// int           pixelQueue = 0;           // Pattern Pixel Queue
+int           pixelCycle = 0;           // Pattern Pixel Cycle
+uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
+int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
+
+Adafruit_NeoPixel strip(LED_COUNT, PIN_KEYPAD_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+
+
+//------------- Lights Implementation -------------//
+void neoPixel_init() {
+  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
+  strip.show();            // Turn OFF all pixels ASAP
+  strip.setBrightness(50); // Set BRIGHTNESS
+}
+
+void neoPixel_update(unsigned long currentMillis) {
+  // unsigned long currentMillis = millis();                     //  Update current time
+
+  if(currentMillis - pixelPrevious >= pixelInterval) {        //  Check for expired time
+    pixelPrevious = currentMillis;                            //  Run current frame
+    // static patterns
+    if (!patternComplete) {
+      patternComplete = true;                                 //  Set pattern complete
+      switch (patternCurrent)
+      {
+        case RED:
+          set_all_color(strip.Color(128, 0, 0));
+          break;
+        case ORANGE:
+          set_all_color(strip.Color(128, 42, 0));
+          break;
+        case YELLOW:
+          set_all_color(strip.Color(128, 128, 0));
+          break;
+        case GREEN:
+          set_all_color(strip.Color(0, 128, 0));
+          break;
+        case BLUE:
+          set_all_color(strip.Color(0, 0, 128));
+          break;
+        case PURPLE:
+          set_all_color(strip.Color(64, 0, 128));
+          break;
+        case PINK:
+          set_all_color(strip.Color(128, 0, 64));
+          break;
+        case WHITE:
+          set_all_color(strip.Color(128, 128, 128));
+          break;
+        case OFF:
+          set_all_color(strip.Color(0, 0, 0));
+          break;
+        default:
+          patternComplete = false;  //  Reset pattern complete
+          break;
+      }
+    }
+    // dynamic patterns
+    switch (patternCurrent) {
+      case RAINBOW_CYCLE:
+        rainbow(); // Flowing rainbow cycle along the whole strip
+        break;
+    }
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+}
+
+// Rainbow cycle along whole strip.
+void rainbow() {
+  for(uint16_t i=0; i < pixelNumber; i++) {
+    strip.setPixelColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255)); //  Update delay time
+  }
+  strip.show();                             //  Update strip to match
+  pixelCycle++;                             //  Advance current cycle
+  if(pixelCycle >= 256)
+    pixelCycle = 0;                         //  Loop the cycle back to the begining
+}
+
+void set_all_color(uint32_t color) {
+  for(uint16_t i=0; i < pixelNumber; i++) {
+    strip.setPixelColor(i, color);
+  }
+  strip.show();
+}
+
+
 //------------- Switch Logic -------------//
 bool should_save_to_macro() {
   return is_recording && !is_playing;
@@ -192,66 +314,17 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
       }
     }
   }
-}
-
-
-//------------- Lights Globals -------------//
-// from "Adafruit Neopixel"/strandtest_nodelay.ino
-unsigned long pixelPrevious = 0;        // Previous Pixel Millis
-// unsigned long patternPrevious = 0;      // Previous Pattern Millis
-// int           patternCurrent = 0;       // Current Pattern Number
-// int           patternInterval = 5000;   // Pattern Interval (ms)
-// bool          patternComplete = false;
-
-int           pixelInterval = 50;       // Pixel Interval (ms)
-// int           pixelQueue = 0;           // Pattern Pixel Queue
-int           pixelCycle = 0;           // Pattern Pixel Cycle
-uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
-int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
-
-Adafruit_NeoPixel strip(LED_COUNT, PIN_KEYPAD_NEOPIXEL, NEO_GRB + NEO_KHZ800);
-
-
-//------------- Lights Implementation -------------//
-void neoPixel_init() {
-  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-  strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(50); // Set BRIGHTNESS to about 1/5 (max = 255)
-}
-
-void neoPixel_update(unsigned long currentMillis) {
-  // unsigned long currentMillis = millis();                     //  Update current time
-
-  if(currentMillis - pixelPrevious >= pixelInterval) {        //  Check for expired time
-    pixelPrevious = currentMillis;                            //  Run current frame
-    rainbow(); // Flowing rainbow cycle along the whole strip
+  // row 0 col 4 cycle light pattern
+  else if (row == 0 && col == 4) {
+    if (is_pressed) {
+      patternCurrent++;
+      if (patternCurrent > OFF) {
+        patternCurrent = RAINBOW_CYCLE;
+      }
+      patternComplete = false;  // reset pattern complete
+      Serial.printf("Light pattern changed to %d.\r\n", patternCurrent);
+    }
   }
-}
-
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  }
-  if(WheelPos < 170) {
-    WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-  WheelPos -= 170;
-  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-}
-
-// Rainbow cycle along whole strip.
-void rainbow() {
-  for(uint16_t i=0; i < pixelNumber; i++) {
-    strip.setPixelColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255)); //  Update delay time
-  }
-  strip.show();                             //  Update strip to match
-  pixelCycle++;                             //  Advance current cycle
-  if(pixelCycle >= 256)
-    pixelCycle = 0;                         //  Loop the cycle back to the begining
 }
 
 
