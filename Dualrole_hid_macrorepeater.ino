@@ -65,11 +65,10 @@ Adafruit_USBD_HID usb_hid;
 
 
 //------------- Macro Globals -------------//
-SimRacingController switchBoard;
 // initialize as if all switches are open
 static bool is_recording = false;
 static bool is_playing = false;
-static bool is_passthrough_on = true; // passthrough by default
+static bool is_passthrough_on = true;  // passthrough by default
 static bool is_delay_on = false;
 
 #define MACRO_BUFFER_SIZE 1000
@@ -153,19 +152,36 @@ bool should_delay() {
 
 //------------- Switch Implementation -------------//
 enum gpio_i {
-  BUTTON_IN = 0,
-  SWITCH1_IN = 1,
-  SWITCH2_IN = 2,
-  SWITCH3_IN = 3,
+  BUTTON1_IN = 0,
+  BUTTON2_IN = 1,
+  BUTTON3_IN = 2,
+  JOYSTICK_UP_IN = 3,
+  JOYSTICK_DOWN_IN = 4,
+  JOYSTICK_LEFT_IN = 5,
+  JOYSTICK_RIGHT_IN = 6,
+  JOYSTICK_PRESS_IN = 7,
 };
 
-static const int gpioPins[4] = { PIN_BUTTON_IN, PIN_SWITCH1_IN, PIN_SWITCH2_IN, PIN_SWITCH3_IN };
+static const int gpioPins[8] = {
+  PIN_BUTTON1_IN,
+  PIN_BUTTON2_IN,
+  PIN_BUTTON3_IN,
+  PIN_JOYSTICK_UP_IN,
+  PIN_JOYSTICK_DOWN_IN,
+  PIN_JOYSTICK_LEFT_IN,
+  PIN_JOYSTICK_RIGHT_IN,
+  PIN_JOYSTICK_PRESS_IN,
+};
+
+SimRacingController switchBoard;
 
 void onGpioChange(int profile, int gpio, bool is_pressed) {
-  // Serial.printf("onGpioChange %d %d %d\n", profile, gpio, is_pressed);
+  Serial.printf("onGpioChange %d %d %d\r\n", profile, gpio, is_pressed);
   switch (gpio) {
 
-    case BUTTON_IN:
+    case BUTTON2_IN:
+      // on press: start playback
+      // on release: nothing
       if (is_pressed && !is_playing) {
         if (macro_len > 0) {
           is_playing = true;
@@ -179,29 +195,35 @@ void onGpioChange(int profile, int gpio, bool is_pressed) {
       }
       break;
 
-    case SWITCH1_IN:
-      // open: off, INPUT_PULLDOWN, is_pressed = true, is_recording = false
-      // closed: on, HIGH, is_pressed = false, is_recording = true
-      is_recording = !is_pressed;
-      digitalWrite(PIN_SWITCH1_LED, is_recording);
-      if (is_recording) {
-        clear_macro();
-        Serial.println("Button pressed, recording macro.");
-      } else if (macro_len <= 0) {
-        undo_clear_macro();
+    case BUTTON1_IN:
+      // on press1: start recording
+      // on press2: stop recording
+      // on release: nothing
+      if (is_pressed) {
+        is_recording = !is_recording;
+        if (is_recording) {
+          clear_macro();
+          Serial.println("Button pressed, recording macro.");
+        } else if (macro_len <= 0) {
+          Serial.println("Button pressed, nothing recorded.");
+          undo_clear_macro();
+        } else {
+          Serial.println("Button pressed, stop recording.");
+        }
       }
       break;
 
-    case SWITCH2_IN:
-      // open: off, INPUT_PULLUP, is_pressed = false, is_passthrough_on = true
-      // closed: on, LOW, is_pressed = true, is_passthrough_on = false
-      is_passthrough_on = !is_pressed;
+    case BUTTON3_IN:
+      // on press1: delay on
+      // on press2: delay off
+      // on release: nothing
+      if (is_pressed) {
+        is_delay_on = !is_delay_on;
+        Serial.printf("Delay %s\r\n", is_delay_on ? "on" : "off");
+      }
       break;
 
-    case SWITCH3_IN:
-      // open: off, INPUT_PULLUP, is_pressed = false, is_delay_on = false
-      // closed: on, LOW, is_pressed = true, is_delay_on = true
-      is_delay_on = is_pressed;
+    default:
       break;
   }
 }
@@ -226,7 +248,7 @@ void setup() {
 
   usb_hid.setPollInterval(2);  // milliseconds
   usb_hid.setReportDescriptor(desc_hid_report, sizeof(desc_hid_report));
-  usb_hid.setStringDescriptor("TinyUSB HID Composite\n");
+  usb_hid.setStringDescriptor("TinyUSB HID Composite\r\n");
   usb_hid.begin();
 
   if (TinyUSBDevice.mounted()) {
@@ -244,7 +266,7 @@ void setup() {
 #endif
 
   // switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
-  switchBoard.setGpio(gpioPins, 4);
+  switchBoard.setGpio(gpioPins, 8);
   // switchBoard.setEncoders(encoderPinsA, encoderPinsB, encoderBtnPins, NUM_ENCODERS);
   switchBoard.setProfiles(1);
   switchBoard.setDebounceTime(50, 5);  // matrix/gpio=50ms, encoder=5ms
@@ -254,7 +276,6 @@ void setup() {
   set_pinMode();
   set_output_poweron();
   switchBoard.begin();
-  pinMode(PIN_SWITCH1_IN, INPUT_PULLDOWN);
 
   Serial.println("TinyUSB Macro Recorder Example");
 }
