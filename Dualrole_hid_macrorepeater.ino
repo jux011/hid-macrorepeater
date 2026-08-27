@@ -154,36 +154,36 @@ enum pattern_lights {
 };
 
 // from "Adafruit Neopixel"/strandtest_nodelay.ino
-unsigned long pixelPrevious = 0;        // Previous Pixel Millis
+unsigned long pixelPrevious = 0;  // Previous Pixel Millis
 // unsigned long patternPrevious = 0;      // Previous Pattern Millis
-int           patternCurrent = 0;       // Current Pattern Number
+int patternCurrent = 0;  // Current Pattern Number
 // int           patternInterval = 5000;   // Pattern Interval (ms)
-bool          patternNeedsUpdate = true;
+bool patternNeedsUpdate = true;
 
-static const int           pixelInterval = 50;       // Pixel Interval (ms)
+static const int pixelInterval = 50;  // Pixel Interval (ms)
 // int           pixelQueue = 0;           // Pattern Pixel Queue
-int           pixelCycle = 0;           // Pattern Pixel Cycle
-static const uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
-static const int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
+int pixelCycle = 0;                                       // Pattern Pixel Cycle
+static const uint16_t pixelNumber = LED_COUNT;            // Total Number of Pixels
+static const int pixelCycleInterval = 256 / pixelNumber;  // Color Interval
 
-static const int           pixelBrightness = 50;      // Pixel Brightness (0-255)
+static const int pixelBrightness = 50;  // Pixel Brightness (0-255)
 
 static const unsigned long pixelOverrideDuration = 1000;  // milliseconds
 
-uint32_t  pixelOverrideColor[LED_COUNT] = {0};
-unsigned long pixelOverrideExpiry[LED_COUNT] = {0};
+uint32_t pixelOverrideColor[LED_COUNT] = { 0 };
+unsigned long pixelOverrideExpiry[LED_COUNT] = { 0 };
 
 Adafruit_NeoPixel strip(LED_COUNT, PIN_KEYPAD_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
-static const uint32_t  colorIndicateEnabled = strip.Color(0, 255, 0);
-static const uint32_t  colorIndicateDisabled = strip.Color(255, 0, 0);
-static const uint32_t  colorIndicateRecording = strip.Color(128, 0, 0);
+static const uint32_t colorIndicateEnabled = strip.Color(0, 255, 0);
+static const uint32_t colorIndicateDisabled = strip.Color(255, 0, 0);
+static const uint32_t colorIndicateRecording = strip.Color(128, 0, 0);
 
 //------------- Lights Implementation -------------//
 void neoPixel_init() {
-  strip.begin();           // INITIALIZE NeoPixel strip object (REQUIRED)
-  strip.show();            // Turn OFF all pixels ASAP
-  strip.setBrightness(pixelBrightness); // Set BRIGHTNESS
+  strip.begin();                         // INITIALIZE NeoPixel strip object (REQUIRED)
+  strip.show();                          // Turn OFF all pixels ASAP
+  strip.setBrightness(pixelBrightness);  // Set BRIGHTNESS
 }
 
 // Update the NeoPixel strip based on the current pattern and any override colors
@@ -201,7 +201,7 @@ void neoPixel_update(unsigned long currentMillis) {
     return;
   }
 
-  if(currentMillis - pixelPrevious < pixelInterval) {
+  if (currentMillis - pixelPrevious < pixelInterval) {
     return;
   }
   pixelPrevious = currentMillis;
@@ -247,7 +247,7 @@ void neoPixel_update(unsigned long currentMillis) {
       break;
     // dynamic patterns
     case RAINBOW_CYCLE:
-      rainbow(currentMillis); // Flowing rainbow cycle along the whole strip
+      rainbow(currentMillis);  // Flowing rainbow cycle along the whole strip
       // patternNeedsUpdate = true;  // dynamic pattern, always needs update
       break;
   }
@@ -259,10 +259,10 @@ void neoPixel_update(unsigned long currentMillis) {
 // The colours are a transition r - g - b - back to r.
 uint32_t Wheel(byte WheelPos) {
   WheelPos = 255 - WheelPos;
-  if(WheelPos < 85) {
+  if (WheelPos < 85) {
     return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
   }
-  if(WheelPos < 170) {
+  if (WheelPos < 170) {
     WheelPos -= 85;
     return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
   }
@@ -271,7 +271,7 @@ uint32_t Wheel(byte WheelPos) {
 }
 
 // Set the override color for a pixel, which will take precedence over the current pattern color
-void setOverrideColor(int pixelIndex, uint32_t color, unsigned long expiryTime=0xFFFFFFFFUL) {
+void setOverrideColor(int pixelIndex, uint32_t color, unsigned long expiryTime = 0xFFFFFFFFUL) {
   if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
     Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
     return;
@@ -299,26 +299,25 @@ void setLightColor(int pixelIndex, uint32_t color, unsigned long currentMillis) 
   }
   if (pixelOverrideExpiry[pixelIndex] > 0 && currentMillis < pixelOverrideExpiry[pixelIndex]) {
     strip.setPixelColor(pixelIndex, pixelOverrideColor[pixelIndex]);
-  }
-  else {
+  } else {
     strip.setPixelColor(pixelIndex, color);
   }
 }
 
 // Rainbow cycle along whole strip. Pass currentMillis to update override colors
 void rainbow(unsigned long currentMillis) {
-  for(uint16_t i=0; i < pixelNumber; i++) {
-    setLightColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255), currentMillis); //  Update delay time
+  for (uint16_t i = 0; i < pixelNumber; i++) {
+    setLightColor(i, Wheel((i * pixelCycleInterval + pixelCycle) & 255), currentMillis);  //  Update delay time
   }
-  strip.show();                             //  Update strip to match
-  pixelCycle++;                             //  Advance current cycle
-  if(pixelCycle >= 256)
-    pixelCycle = 0;                         //  Loop the cycle back to the begining
+  strip.show();  //  Update strip to match
+  pixelCycle++;  //  Advance current cycle
+  if (pixelCycle >= 256)
+    pixelCycle = 0;  //  Loop the cycle back to the begining
 }
 
 // Set all pixels to the same color, respecting any override colors
 void set_all_color(uint32_t color, unsigned long currentMillis) {
-  for(uint16_t i=0; i < pixelNumber; i++) {
+  for (uint16_t i = 0; i < pixelNumber; i++) {
     setLightColor(i, color, currentMillis);
   }
   strip.show();
@@ -342,8 +341,8 @@ bool should_delay() {
 //------------- Switch Implementation -------------//
 const int MATRIX_ROWS = 2;
 const int MATRIX_COLS = 5;
-const int rowPins[MATRIX_ROWS] = {PIN_KEYPAD_R1, PIN_KEYPAD_R2};
-const int colPins[MATRIX_COLS] = {PIN_KEYPAD_C1, PIN_KEYPAD_C2, PIN_KEYPAD_C3, PIN_KEYPAD_C4, PIN_KEYPAD_C5};
+const int rowPins[MATRIX_ROWS] = { PIN_KEYPAD_R1, PIN_KEYPAD_R2 };
+const int colPins[MATRIX_COLS] = { PIN_KEYPAD_C1, PIN_KEYPAD_C2, PIN_KEYPAD_C3, PIN_KEYPAD_C4, PIN_KEYPAD_C5 };
 
 SimRacingController switchBoard;
 
