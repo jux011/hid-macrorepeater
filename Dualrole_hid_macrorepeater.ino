@@ -92,6 +92,7 @@ void usb_hid_send_my_rid_keyboard_report(const hid_keyboard_report_t this_report
 
 // Macro playback: Send all recorded reports to PC in order
 void play_macro() {
+  Serial.println("Macro playback started.");
   usb_hid_send_my_rid_keyboard_report(&macroBuffer[0]);
   if (should_delay()) {
     for (size_t i = 1; i < macro_len; ++i) {
@@ -105,6 +106,7 @@ void play_macro() {
     }
   }
   usb_hid_send_my_rid_keyboard_report(&null_report);
+  Serial.println("Macro playback finished.");
 }
 
 void clear_macro() {
@@ -126,7 +128,7 @@ void save_to_macro(const hid_keyboard_report_t report[]) {
     macroBuffer[0] = *report;
     delayBuffer[0] = now;
     macro_len = 1;
-    Serial.printf("Macro started, macro starttime: %u\r\n", delayBuffer[0]);
+    Serial.printf("Macro step 0 saved, macro starttime: %u\r\n", delayBuffer[0]);
   } else if (macro_len < MACRO_BUFFER_SIZE) {
     macroBuffer[macro_len] = *report;
     delayBuffer[macro_len] = now - delayBuffer[0];
@@ -370,12 +372,10 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
     case 9:
       if (is_pressed) {
         is_playing = true;
-        Serial.println("Macro playback started.");
         setOverrideColor(key, colorIndicateEnabled);
         play_macro();
         is_playing = false;
         clearOverrideColor(key);
-        Serial.println("Macro playback finished.");
       }
       break;
 
@@ -385,10 +385,13 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
         if (is_recording) {
           is_recording = false;
           Serial.println("Macro recording stopped.");
-          clearOverrideColor(key);
           if (macro_len == 0) {
             Serial.println("No macro recorded.");
             undo_clear_macro();
+            setOverrideColor(key, colorIndicateDisabled, millis() + pixelOverrideDuration);
+          }
+          else {
+            setOverrideColor(key, colorIndicateEnabled, millis() + pixelOverrideDuration);
           }
         } else {
           is_recording = true;
@@ -534,9 +537,9 @@ extern "C" {
 
     uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
     if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
-      Serial.printf("HID Keyboard\r\n");
+      Serial.println("HID Keyboard");
       if (!tuh_hid_receive_report(dev_addr, instance)) {
-        Serial.printf("Error: cannot request to receive report\r\n");
+        Serial.println("Error: cannot request to receive report");
       }
       return;
     }
@@ -547,21 +550,21 @@ extern "C" {
       &info, &consumer_page_start, &consumer_page_end,
       desc_report, desc_len);
     if (!found) {
-      // Serial.printf("this instance is not a keyboard protocol");
+      // Serial.println("this instance is not a keyboard protocol");
       return;
     }
 
-    Serial.printf("HID Consumer Control\r\n");
+    Serial.println("HID Consumer Control");
     bool success = tuh_compute_consumer_page_values(
       desc_report, consumer_page_start, consumer_page_end,
       instance, info.report_id);
     if (!success) {
-      Serial.printf("Error: cannot compute report_size, instance, report_id, \r\n");
+      Serial.println("Error: cannot compute report_size, instance, report_id");
       return;
     }
 
     if (!tuh_hid_receive_report(dev_addr, instance)) {
-      Serial.printf("Error: cannot request to receive report\r\n");
+      Serial.println("Error: cannot request to receive report");
     }
     return;
   }
@@ -606,7 +609,7 @@ extern "C" {
 
     // continue to request to receive report
     if (!tuh_hid_receive_report(dev_addr, instance)) {
-      Serial.printf("Error: cannot request to receive report\r\n");
+      Serial.println("Error: cannot request to receive report");
     }
   }
 }
