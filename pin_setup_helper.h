@@ -2,7 +2,7 @@
 static_assert(ARDUINO_ARCH_RP2040);
 
 // diodes are setup 29 14 high -> 15 27 13 12 28 low
-// roncoa calls digitalWrite(rowPins, HIGH) and bool(digitalRead(colPins) == LOW
+// roncoa calls digitalWrite(rowPins, HIGH) and bool(digitalRead(colPins) == LOW)
 // therefore, swap rows and columns in software
 
 #define PIN_KEYPAD_C1 15

@@ -30,7 +30,7 @@
 // USBHost is defined in usbh_helper.h
 #include "usbh_helper.h"
 
-// neopixel must be included AFTER "pio_usb.h", in order to invoke pio2
+// NeoPixel must be included AFTER "pio_usb.h", in order to invoke pio2
 #include <Adafruit_NeoPixel.h>
 
 // #include "usbh_extension.ino"  // inclusion is automatic
@@ -54,7 +54,7 @@ uint8_t const desc_hid_report[] = {
 
 // valid values can be found in enum{} on line 897
 // of Adafruit_TinyUSB_Library\src\class\hid\usages.h
-static uint16_t consumer_keys_list[6] = {
+static const uint16_t consumer_keys_list[6] = {
   HID_USAGE_CONSUMER_SCAN_PREVIOUS_TRACK,
   HID_USAGE_CONSUMER_PLAY_PAUSE,
   HID_USAGE_CONSUMER_SCAN_NEXT_TRACK,
@@ -160,24 +160,24 @@ int           patternCurrent = 0;       // Current Pattern Number
 // int           patternInterval = 5000;   // Pattern Interval (ms)
 bool          patternNeedsUpdate = true;
 
-int           pixelInterval = 50;       // Pixel Interval (ms)
+static const int           pixelInterval = 50;       // Pixel Interval (ms)
 // int           pixelQueue = 0;           // Pattern Pixel Queue
 int           pixelCycle = 0;           // Pattern Pixel Cycle
-uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
-int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
+static const uint16_t      pixelNumber = LED_COUNT;  // Total Number of Pixels
+static const int           pixelCycleInterval = 256/pixelNumber;           // Color Interval
 
-int           pixelBrightness = 50;      // Pixel Brightness (0-255)
+static const int           pixelBrightness = 50;      // Pixel Brightness (0-255)
 
-unsigned long pixelOverrideDuration = 1000;  // milliseconds
+static const unsigned long pixelOverrideDuration = 1000;  // milliseconds
 
 uint32_t  pixelOverrideColor[LED_COUNT] = {0};
 unsigned long pixelOverrideExpiry[LED_COUNT] = {0};
 
 Adafruit_NeoPixel strip(LED_COUNT, PIN_KEYPAD_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
-uint32_t  colorIndicateEnabled = strip.Color(0, 255, 0);
-uint32_t  colorIndicateDisabled = strip.Color(255, 0, 0);
-uint32_t  colorIndicateRecording = strip.Color(128, 0, 0);
+static const uint32_t  colorIndicateEnabled = strip.Color(0, 255, 0);
+static const uint32_t  colorIndicateDisabled = strip.Color(255, 0, 0);
+static const uint32_t  colorIndicateRecording = strip.Color(128, 0, 0);
 
 //------------- Lights Implementation -------------//
 void neoPixel_init() {
@@ -186,7 +186,9 @@ void neoPixel_init() {
   strip.setBrightness(pixelBrightness); // Set BRIGHTNESS
 }
 
+// Update the NeoPixel strip based on the current pattern and any override colors
 void neoPixel_update(unsigned long currentMillis) {
+  // unsigned long currentMillis = millis();
   for (int i = 0; i < LED_COUNT; i++) {
     if (pixelOverrideExpiry[i] > 0 && currentMillis > pixelOverrideExpiry[i]) {
       pixelOverrideColor[i] = 0;
@@ -199,16 +201,14 @@ void neoPixel_update(unsigned long currentMillis) {
     return;
   }
 
-  // check if it's time to update the pixels
-  // unsigned long currentMillis = millis();
   if(currentMillis - pixelPrevious < pixelInterval) {
     return;
   }
   pixelPrevious = currentMillis;
-  //  Run current frame
 
-  // static patterns
+  //  Run current frame
   switch (patternCurrent) {
+    // static patterns
     case RED:
       set_all_color(strip.Color(128, 0, 0), currentMillis);
       patternNeedsUpdate = false;
@@ -270,6 +270,7 @@ uint32_t Wheel(byte WheelPos) {
   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
 
+// Set the override color for a pixel, which will take precedence over the current pattern color
 void setOverrideColor(int pixelIndex, uint32_t color, unsigned long expiryTime=0xFFFFFFFFUL) {
   if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
     Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
@@ -280,6 +281,7 @@ void setOverrideColor(int pixelIndex, uint32_t color, unsigned long expiryTime=0
   patternNeedsUpdate = true;
 }
 
+// Clear the override color for a pixel, allowing it to return to the current pattern color
 void clearOverrideColor(int pixelIndex) {
   if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
     Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
@@ -289,6 +291,7 @@ void clearOverrideColor(int pixelIndex) {
   patternNeedsUpdate = true;
 }
 
+// Set the color of a pixel, respecting any override colors
 void setLightColor(int pixelIndex, uint32_t color, unsigned long currentMillis) {
   if (pixelIndex < 0 || pixelIndex >= LED_COUNT) {
     Serial.printf("Invalid pixel index %d, must be between 0 and %d\r\n", pixelIndex, LED_COUNT - 1);
@@ -302,7 +305,7 @@ void setLightColor(int pixelIndex, uint32_t color, unsigned long currentMillis) 
   }
 }
 
-// Rainbow cycle along whole strip.
+// Rainbow cycle along whole strip. Pass currentMillis to update override colors
 void rainbow(unsigned long currentMillis) {
   for(uint16_t i=0; i < pixelNumber; i++) {
     setLightColor(i, Wheel((i*pixelCycleInterval + pixelCycle) & 255), currentMillis); //  Update delay time
@@ -313,6 +316,7 @@ void rainbow(unsigned long currentMillis) {
     pixelCycle = 0;                         //  Loop the cycle back to the begining
 }
 
+// Set all pixels to the same color, respecting any override colors
 void set_all_color(uint32_t color, unsigned long currentMillis) {
   for(uint16_t i=0; i < pixelNumber; i++) {
     setLightColor(i, color, currentMillis);
@@ -343,6 +347,7 @@ const int colPins[MATRIX_COLS] = {PIN_KEYPAD_C1, PIN_KEYPAD_C2, PIN_KEYPAD_C3, P
 
 SimRacingController switchBoard;
 
+// Return the key index based on the row and column of the matrix
 int keyIndex(int row, int col) {
   if (row < 0 || row >= MATRIX_ROWS || col < 0 || col >= MATRIX_COLS) {
     Serial.printf("Invalid row %d or col %d, must be between 0 and %d, 0 and %d\r\n", row, col, MATRIX_ROWS - 1, MATRIX_COLS - 1);
@@ -358,6 +363,7 @@ int keyIndex(int row, int col) {
   return -1;  // should never reach here
 }
 
+// Callback function for matrix changes, handling key presses and releases
 void onMatrixChange(int profile, int row, int col, bool is_pressed) {
   int key = keyIndex(row, col);
   switch (key) {
