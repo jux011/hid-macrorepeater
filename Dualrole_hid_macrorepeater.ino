@@ -158,7 +158,7 @@ unsigned long pixelPrevious = 0;        // Previous Pixel Millis
 // unsigned long patternPrevious = 0;      // Previous Pattern Millis
 int           patternCurrent = 0;       // Current Pattern Number
 // int           patternInterval = 5000;   // Pattern Interval (ms)
-bool          patternComplete = false;
+bool          patternNeedsUpdate = true;
 
 int           pixelInterval = 50;       // Pixel Interval (ms)
 // int           pixelQueue = 0;           // Pattern Pixel Queue
@@ -191,11 +191,11 @@ void neoPixel_update(unsigned long currentMillis) {
     if (pixelOverrideExpiry[i] > 0 && currentMillis > pixelOverrideExpiry[i]) {
       pixelOverrideColor[i] = 0;
       pixelOverrideExpiry[i] = 0;
-      patternComplete = false;  // reset pattern complete
+      patternNeedsUpdate = true;
     }
   }
 
-  if (patternComplete) {
+  if (!patternNeedsUpdate) {
     return;
   }
 
@@ -211,44 +211,44 @@ void neoPixel_update(unsigned long currentMillis) {
   switch (patternCurrent) {
     case RED:
       set_all_color(strip.Color(128, 0, 0), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case ORANGE:
       set_all_color(strip.Color(128, 42, 0), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case YELLOW:
       set_all_color(strip.Color(128, 128, 0), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case GREEN:
       set_all_color(strip.Color(0, 128, 0), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case BLUE:
       set_all_color(strip.Color(0, 0, 128), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case PURPLE:
       set_all_color(strip.Color(64, 0, 128), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case PINK:
       set_all_color(strip.Color(128, 0, 64), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case WHITE:
       set_all_color(strip.Color(128, 128, 128), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     case OFF:
       set_all_color(strip.Color(0, 0, 0), currentMillis);
-      patternComplete = true;
+      patternNeedsUpdate = false;
       break;
     // dynamic patterns
     case RAINBOW_CYCLE:
       rainbow(currentMillis); // Flowing rainbow cycle along the whole strip
-      // patternComplete = false;  // never complete
+      // patternNeedsUpdate = true;  // dynamic pattern, always needs update
       break;
   }
 }
@@ -277,7 +277,7 @@ void setOverrideColor(int pixelIndex, uint32_t color, unsigned long expiryTime=0
   }
   pixelOverrideColor[pixelIndex] = color;
   pixelOverrideExpiry[pixelIndex] = expiryTime;
-  patternComplete = false;  // reset pattern complete
+  patternNeedsUpdate = true;
 }
 
 void clearOverrideColor(int pixelIndex) {
@@ -286,7 +286,7 @@ void clearOverrideColor(int pixelIndex) {
     return;
   }
   pixelOverrideExpiry[pixelIndex] = 0;
-  patternComplete = false;  // reset pattern complete
+  patternNeedsUpdate = true;
 }
 
 void setLightColor(int pixelIndex, uint32_t color, unsigned long currentMillis) {
@@ -360,58 +360,63 @@ int keyIndex(int row, int col) {
 
 void onMatrixChange(int profile, int row, int col, bool is_pressed) {
   int key = keyIndex(row, col);
-  // key 9 play macro
-  if (key == 9) {
-    if (is_pressed) {
-      is_playing = true;
-      Serial.println("Macro playback started.");
-      setOverrideColor(key, colorIndicateEnabled);
-      play_macro();
-      is_playing = false;
-      clearOverrideColor(key);
-      Serial.println("Macro playback finished.");
-    }
-  }
-  // key 0 start/stop recording
-  else if (key == 0) {
-    if (is_pressed) {
-      if (is_recording) {
-        is_recording = false;
-        Serial.println("Macro recording stopped.");
+  switch (key) {
+    // key 9 play macro
+    case 9:
+      if (is_pressed) {
+        is_playing = true;
+        Serial.println("Macro playback started.");
+        setOverrideColor(key, colorIndicateEnabled);
+        play_macro();
+        is_playing = false;
         clearOverrideColor(key);
-        if (macro_len == 0) {
-          Serial.println("No macro recorded.");
-          undo_clear_macro();
-        }
-      } else {
-        is_recording = true;
-        Serial.println("Macro recording started.");
-        setOverrideColor(key, colorIndicateRecording);
-        if (macro_len > 0) {
-          Serial.printf("Overwriting existing macro of length %u.\r\n", macro_len);
-          clear_macro();
+        Serial.println("Macro playback finished.");
+      }
+      break;
+
+    // key 0 start/stop recording
+    case 0:
+      if (is_pressed) {
+        if (is_recording) {
+          is_recording = false;
+          Serial.println("Macro recording stopped.");
+          clearOverrideColor(key);
+          if (macro_len == 0) {
+            Serial.println("No macro recorded.");
+            undo_clear_macro();
+          }
+        } else {
+          is_recording = true;
+          Serial.println("Macro recording started.");
+          setOverrideColor(key, colorIndicateRecording);
+          if (macro_len > 0) {
+            Serial.printf("Overwriting existing macro of length %u.\r\n", macro_len);
+            clear_macro();
+          }
         }
       }
-    }
-  }
-  // key 5 cycle light pattern
-  else if (key == 5) {
-    if (is_pressed) {
-      patternCurrent++;
-      if (patternCurrent > OFF) {
-        patternCurrent = RAINBOW_CYCLE;
+      break;
+
+    // key 5 cycle light pattern
+    case 5:
+      if (is_pressed) {
+        patternCurrent++;
+        if (patternCurrent > OFF) {
+          patternCurrent = RAINBOW_CYCLE;
+        }
+        patternNeedsUpdate = true;
+        Serial.printf("Light pattern changed to %d.\r\n", patternCurrent);
       }
-      patternComplete = false;  // reset pattern complete
-      Serial.printf("Light pattern changed to %d.\r\n", patternCurrent);
-    }
-  }
-  // key 4 toggle delay on/off
-  else if (key == 4) {
-    if (is_pressed) {
-      is_delay_on = !is_delay_on;
-      setOverrideColor(key, is_delay_on ? colorIndicateEnabled : colorIndicateDisabled, millis() + pixelOverrideDuration);
-      Serial.printf("Delay %s.\r\n", is_delay_on ? "enabled" : "disabled");
-    }
+      break;
+
+    // key 4 toggle delay on/off
+    case 4:
+      if (is_pressed) {
+        is_delay_on = !is_delay_on;
+        setOverrideColor(key, is_delay_on ? colorIndicateEnabled : colorIndicateDisabled, millis() + pixelOverrideDuration);
+        Serial.printf("Delay %s.\r\n", is_delay_on ? "enabled" : "disabled");
+      }
+      break;
   }
 }
 
