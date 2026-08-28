@@ -1,5 +1,7 @@
 // waveshare rp2040 Zero  +  nilight switches
-static_assert(ARDUINO_ARCH_RP2040);
+#ifndef ARDUINO_ARCH_RP2040
+  #error "Error: ARDUINO_ARCH_RP2040 is not defined! target hardware is RP2040."
+#endif
 
 #define PIN_BUTTON_OUT 10
 #define PIN_BUTTON_IN 11
