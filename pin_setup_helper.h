@@ -1,5 +1,7 @@
 // waveshare rp2040 Zero  +  2x5 ameoba_king_pcb
-static_assert(ARDUINO_ARCH_RP2040);
+#ifndef ARDUINO_ARCH_RP2040
+  #error "Error: ARDUINO_ARCH_RP2040 is not defined! target hardware is RP2040."
+#endif
 
 // diodes are setup 29 14 high -> 15 27 13 12 28 low
 // roncoa calls digitalWrite(rowPins, HIGH) and bool(digitalRead(colPins) == LOW)
