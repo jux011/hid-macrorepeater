@@ -137,6 +137,10 @@ void save_to_macro(const hid_keyboard_report_t report[]) {
 }
 
 
+//------------- FS Implementation -------------//
+#include "FS_save_macro.h"
+
+
 //------------- Switch Logic -------------//
 bool should_save_to_macro() {
   return is_recording && !is_playing;
@@ -209,7 +213,12 @@ void onGpioChange(int profile, int gpio, bool is_pressed) {
           Serial.println("Button pressed, nothing recorded.");
           undo_clear_macro();
         } else {
-          Serial.println("Button pressed, stop recording.");
+          Serial.println("Button released, stopping macro recording.");
+          if (FS_ENABLED) {
+          write_macro_to_FS(macroBuffer, delayBuffer, macro_len, MACRO0);
+          Serial.println("Macro saved to FS");
+        }
+
         }
       }
       break;
@@ -278,7 +287,15 @@ void setup() {
   set_output_poweron();
   switchBoard.begin();
 
+  init_FS();
+
   Serial.println("TinyUSB Macro Recorder Example");
+
+  if (FS_ENABLED) {
+    load_macro_from_FS(macroBuffer, delayBuffer, &macro_len, MACRO0);
+    Serial.println("Macro loaded from FS");
+    delayBuffer[0] = millis();
+  }
 }
 
 void loop() {
