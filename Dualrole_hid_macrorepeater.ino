@@ -356,7 +356,6 @@ extern "C" {
     if (instance == consumer_keyboard_parser.get_tuh_consumer_instance()) {
       consumer_keyboard_parser.reset();
     }
-    clear_macro();
   }
 
   // Invoked when received report from device via interrupt endpoint
