@@ -468,7 +468,7 @@ void setup() {
   switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
   // switchBoard.setGpio(gpioPins, 8);
   // switchBoard.setEncoders(encoderPinsA, encoderPinsB, encoderBtnPins, NUM_ENCODERS);
-  switchBoard.setProfiles(1);
+  // switchBoard.setProfiles(1);
   switchBoard.setDebounceTime(50, 5);  // matrix/gpio=50ms, encoder=5ms
 
   // Set callbacks
@@ -575,7 +575,6 @@ extern "C" {
     if (instance == get_tuh_consumer_instance()) {
       tuh_init_consumer_settings();
     }
-    clear_macro();
   }
 
   // Invoked when received report from device via interrupt endpoint
@@ -590,6 +589,8 @@ extern "C" {
           save_to_macro(boot_report);
         }
 
+        // NOTE: for better performance you should save/queue remapped report instead of
+        // blocking wait for usb_hid ready here
         if (should_send_passthrough()) {
           usb_hid_send_my_rid_keyboard_report(boot_report);
         }
