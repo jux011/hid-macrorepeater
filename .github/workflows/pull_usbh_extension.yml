@@ -1,0 +1,75 @@
+name: Pull File from Another Repository on Push
+env:
+  SOURCE_REPO: https://github.com/jux011/ConsumerKeyboard-Host
+  AUTOMATIC_MONITOR: true
+  FILES: "*usbh_extension*" # seperate multiple entries with ,
+  FILES_NEW: "*usbh_extension*" # seperate multiple entries with ,
+  # EXTRA: mv LICENSE LICENSE_some_repo # do an extra command like renaming
+  # TOKEN_NAME: ACCESS_TOKEN # uncomment to use a secret with that name
+  # SOURCE_BRANCH: source_alternate # uncomment to not monitor the default branch
+  # TARGET_BRANCH: target_alternate # uncomment to not push to default branch
+
+on: # Remove # below for non default branches
+  workflow_dispatch:
+#    inputs:
+#      source_branch:
+#        description: '${{ env.SOURCE_BRANCH }}'
+#        required: false
+  push:
+#    branches:
+#      - ${{ env.SOURCE_BRANCH }}
+    paths:
+      - ./source-repo/**
+
+jobs:
+  pull-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check whether to automatically monitor
+        if: ${{ github.event_name != 'workflow_dispatch' && env.AUTOMATIC_MONITOR == false }}
+        run: |
+          exit 1
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Pull File
+        env:
+          # THE_TOKEN: ${{ secrets.$TOKEN_NAME }}
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_BRANCH: ${{ github.event.inputs.source_branch }}
+          REF: ${{ github.ref }}
+        run: |
+          #!/bin/sh
+          
+          if [ -n "$TOKEN_NAME" ]; then
+            REPO_URL=https://$THE_TOKEN@$SOURCE_REPO.git
+          else
+            REPO_URL=$SOURCE_REPO.git
+          fi
+          
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -n "$SOURCE_BRANCH" ]; then
+              git clone -b $SOURCE_BRANCH $REPO_URL source-repo
+            else
+              git clone $REPO_URL source-repo
+            fi
+          else
+            git clone -b $REF $REPO_URL source-repo
+          fi
+          cd source-repo
+          $EXTRA
+          cp -u $FILES_NEW ../
+          cd ..
+      - name: Commit
+        run: |
+          git config user.name "$USERNAME"
+          git config user.email "$USERNAME@$ADDRESS_SUFFIX"
+          git add $FILES_NEW
+          git commit -m "Pulled files from $SOURCE_REPO."
+      - name: Push
+        run: |
+          if [ -n "$TARGET_BRANCH" ]; then
+            git push origin $TARGET_BRANCH
+          else
+            git push
+          fi
