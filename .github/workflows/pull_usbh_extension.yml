@@ -1,4 +1,4 @@
-name: Pull File from Another Repository on Push
+name: auto fetch usbh_extension from ConsumerKeyboard-Host repo
 env:
   SOURCE_REPO: https://github.com/jux011/ConsumerKeyboard-Host
   AUTOMATIC_MONITOR: true
