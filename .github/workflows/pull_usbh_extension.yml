@@ -30,8 +30,8 @@ jobs:
         run: |
           exit 1
       - name: Checkout
-        uses: actions/checkout@v3
-
+        uses: actions/checkout@v7
+      
       - name: Pull File
         env:
           # THE_TOKEN: ${{ secrets.$TOKEN_NAME }}
@@ -62,8 +62,8 @@ jobs:
           cd ..
       - name: Commit
         run: |
-          git config user.name "$USERNAME"
-          git config user.email "$USERNAME@$ADDRESS_SUFFIX"
+          git config --local user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git config --local user.name "${{ github.actor }}"
           git add $FILES_NEW
           git commit -m "Pulled files from $SOURCE_REPO."
       - name: Push
