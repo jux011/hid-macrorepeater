@@ -33,7 +33,7 @@
 // NeoPixel must be included AFTER "pio_usb.h", in order to invoke pio2
 #include <Adafruit_NeoPixel.h>
 
-// #include "usbh_extension.ino"  // inclusion is automatic
+#include "usbh_extension.h"
 
 
 //------------- TinyUSB HID Globals -------------//
@@ -66,6 +66,7 @@ static const uint16_t consumer_keys_list[6] = {
 // USB HID object
 Adafruit_USBD_HID usb_hid;
 
+ConsumerKeyboard_Host consumer_keyboard_parser(consumer_keys_list, 6);
 
 //------------- Macro Globals -------------//
 // initialize as if all switches are open
@@ -499,8 +500,6 @@ void setup1() {
   // configure pio-usb: defined in usbh_helper.h
   rp2040_configure_pio_usb();
 
-  tuh_init_consumer_settings(consumer_keys_list, 6);
-
   neoPixel_init();
 
   // run host stack on controller (rhport) 1
@@ -544,22 +543,9 @@ extern "C" {
       return;
     }
 
-    tuh_hid_report_info_t info;
-    uint16_t consumer_page_start, consumer_page_end;
-    bool found = tuh_hid_get_consumer_page(
-      &info, &consumer_page_start, &consumer_page_end,
-      desc_report, desc_len);
-    if (!found) {
-      // Serial.println("this instance is not a keyboard protocol");
-      return;
-    }
-
-    Serial.println("HID Consumer Control");
-    bool success = tuh_compute_consumer_page_values(
-      desc_report, consumer_page_start, consumer_page_end,
-      instance, info.report_id);
-    if (!success) {
-      Serial.println("Error: cannot compute report_size, instance, report_id");
+    int status = consumer_keyboard_parser.process_desc_report(desc_report, desc_len, instance);
+    if (status != 0) {
+      // Serial.printf("This instance is not a keyboard protocol");
       return;
     }
 
@@ -572,8 +558,8 @@ extern "C" {
   // Invoked when device with hid interface is un-mounted
   void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
     Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
-    if (instance == get_tuh_consumer_instance()) {
-      tuh_init_consumer_settings();
+    if (instance == consumer_keyboard_parser.get_tuh_consumer_instance()) {
+      consumer_keyboard_parser.reset();
     }
   }
 
@@ -596,9 +582,9 @@ extern "C" {
         }
       }
 
-    } else if (instance == get_tuh_consumer_instance()) {
+    } else if (instance == consumer_keyboard_parser.get_tuh_consumer_instance()) {
       // Serial.printf("Received report from consumer control instance %d, len = %u\r\n", instance, len);
-      uint16_t report_consumer_key = tuh_process_consumer_report(report, len);
+      uint16_t report_consumer_key = consumer_keyboard_parser.process_consumer_report(report, len);
 
       // NOTE: for better performance you should save/queue remapped report instead of
       // blocking wait for usb_hid ready here
