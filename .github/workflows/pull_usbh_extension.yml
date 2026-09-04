@@ -21,6 +21,9 @@ on: # Remove # below for non default branches
     paths:
       - ./source-repo/**
 
+permissions:
+  contents: write
+
 jobs:
   pull-file:
     runs-on: ubuntu-latest
