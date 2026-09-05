@@ -404,6 +404,8 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
           }
           else {
             setOverrideColor(key, colorIndicateEnabled, millis() + pixelOverrideDuration);
+            write_macro_to_FS(macroBuffer[col], delayBuffer[col], macro_len[col], col+1);
+            Serial.printf("Macro %u of length %u saved to FS.\r\n", col+1, macro_len[col]);
           }
           is_recording = MACRO_OFF;
         } else if (is_recording == MACRO_OFF) {
@@ -477,6 +479,12 @@ void setup() {
     delay(10);
   }
 #endif
+
+  init_FS();
+  for (int j = 0;j<MACRO_BUFFER_COUNT;j++) {
+    load_macro_from_FS(macroBuffer[j], delayBuffer[j], &macro_len[j], j+1);
+    Serial.printf("Macro %u loaded from FS, length = %u.\r\n", j+1, macro_len[j]);
+  }
 
   switchBoard.setMatrix(rowPins, MATRIX_ROWS, colPins, MATRIX_COLS);
   // switchBoard.setGpio(gpioPins, 8);
