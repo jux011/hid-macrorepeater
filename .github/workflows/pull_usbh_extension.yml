@@ -7,7 +7,7 @@ env:
   # EXTRA: mv LICENSE LICENSE_some_repo # do an extra command like renaming
   # TOKEN_NAME: ACCESS_TOKEN # uncomment to use a secret with that name
   # SOURCE_BRANCH: source_alternate # uncomment to not monitor the default branch
-  # TARGET_BRANCH: target_alternate # uncomment to not push to default branch
+  TARGET_BRANCH: ${{ github.ref_name }} # uncomment to not push to default branch
 
 on: # Remove # below for non default branches
   workflow_dispatch:
