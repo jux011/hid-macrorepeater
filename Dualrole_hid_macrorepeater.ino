@@ -68,19 +68,25 @@ Adafruit_USBD_HID usb_hid;
 
 ConsumerKeyboard_Host consumer_keyboard_parser(consumer_keys_list, 6);
 
+
+//------------- LittleFS Implementation -------------//
+#define MACRO_BUFFER_SIZE 1000
+#define MACRO_BUFFER_COUNT 4
+#include "FS_save_macro.h"
+
+
 //------------- Macro Globals -------------//
 // initialize as if all switches are open
-static bool is_recording = false;
+static size_t is_recording = MACRO_OFF;
 static bool is_playing = false;
 static bool is_passthrough_on = true;  // passthrough by default
 static bool is_delay_on = false;
 
-#define MACRO_BUFFER_SIZE 1000
-static hid_keyboard_report_t macroBuffer[MACRO_BUFFER_SIZE];
-static unsigned long delayBuffer[MACRO_BUFFER_SIZE];
-// unsigned long *macro_starttime = &delayBuffer[0];
-static size_t macro_len = 0;
-static size_t old_macro_len = 0;
+static hid_keyboard_report_t macroBuffer[MACRO_BUFFER_COUNT][MACRO_BUFFER_SIZE];
+static unsigned long delayBuffer[MACRO_BUFFER_COUNT][MACRO_BUFFER_SIZE];
+
+static size_t macro_len[MACRO_BUFFER_COUNT];
+static size_t old_macro_len[MACRO_BUFFER_COUNT];
 
 
 //------------- Macro Implementation -------------//
@@ -92,50 +98,50 @@ void usb_hid_send_my_rid_keyboard_report(const hid_keyboard_report_t this_report
 }
 
 // Macro playback: Send all recorded reports to PC in order
-void play_macro() {
+void play_macro(size_t target_i) {
   Serial.println("Macro playback started.");
-  usb_hid_send_my_rid_keyboard_report(&macroBuffer[0]);
+  usb_hid_send_my_rid_keyboard_report(&macroBuffer[target_i][0]);
   if (should_delay()) {
-    for (size_t i = 1; i < macro_len; ++i) {
-      delay(delayBuffer[i]);
-      usb_hid_send_my_rid_keyboard_report(&macroBuffer[i]);
+    for (size_t i = 1; i < macro_len[target_i]; ++i) {
+      delay(delayBuffer[target_i][i]);
+      usb_hid_send_my_rid_keyboard_report(&macroBuffer[target_i][i]);
     }
   } else {
-    for (size_t i = 1; i < macro_len; ++i) {
+    for (size_t i = 1; i < macro_len[target_i]; ++i) {
       delay(15);  // 66hz, 400wpm
-      usb_hid_send_my_rid_keyboard_report(&macroBuffer[i]);
+      usb_hid_send_my_rid_keyboard_report(&macroBuffer[target_i][i]);
     }
   }
   usb_hid_send_my_rid_keyboard_report(&null_report);
   Serial.println("Macro playback finished.");
 }
 
-void clear_macro() {
-  old_macro_len = macro_len;
-  macro_len = 0;
-  Serial.println("Macro cleared.");
+void clear_macro(size_t i) {
+  old_macro_len[i] = macro_len[i];
+  macro_len[i] = 0;
+  Serial.printf("Macro %u cleared.\r\n", i);
 }
 
-void undo_clear_macro() {
-  macro_len = old_macro_len;
-  // old_macro_len = 0;
-  Serial.printf("Macro reset to %u.\r\n", macro_len);
+void undo_clear_macro(size_t i) {
+  macro_len[i] = old_macro_len[i];
+  // old_macro_len[i] = 0;
+  Serial.printf("Macro %u reset to %u.\r\n", i, macro_len[i]);
 }
 
 // Save the received keyboard report to macro buffer
-void save_to_macro(const hid_keyboard_report_t report[]) {
+void save_to_macro(const hid_keyboard_report_t report[], size_t i) {
   unsigned long now = millis();
-  if (macro_len == 0) {
-    macroBuffer[0] = *report;
-    delayBuffer[0] = now;
-    macro_len = 1;
-    Serial.printf("Macro step 0 saved, macro starttime: %u\r\n", delayBuffer[0]);
-  } else if (macro_len < MACRO_BUFFER_SIZE) {
-    macroBuffer[macro_len] = *report;
-    delayBuffer[macro_len] = now - delayBuffer[0];
-    delayBuffer[0] = now;
-    macro_len++;
-    Serial.printf("Macro step %d saved.\r\n", macro_len);
+  if (macro_len[i] == 0) {
+    macroBuffer[i][0] = *report;
+    delayBuffer[i][0] = now;
+    macro_len[i] = 1;
+    Serial.printf("Macro step 0 saved, macro starttime: %u\r\n", delayBuffer[i][0]);
+  } else if (macro_len[i] < MACRO_BUFFER_SIZE) {
+    macroBuffer[i][macro_len[i]] = *report;
+    delayBuffer[i][macro_len[i]] = now - delayBuffer[i][0];
+    delayBuffer[i][0] = now;
+    macro_len[i]++;
+    Serial.printf("Macro step %d saved.\r\n", macro_len[i]);
   } else {
     Serial.println("Macro buffer full, cannot save more steps.");
   }
@@ -329,11 +335,11 @@ void set_all_color(uint32_t color, unsigned long currentMillis) {
 
 //------------- Switch Logic -------------//
 bool should_save_to_macro() {
-  return is_recording && !is_playing;
+  return (is_recording != MACRO_OFF) && !is_playing;
 }
 
 bool should_send_passthrough() {
-  return !is_playing && (is_passthrough_on || !is_recording);
+  return !is_playing && (is_passthrough_on || (is_recording == MACRO_OFF));
 }
 
 bool should_delay() {
@@ -371,10 +377,13 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
   switch (key) {
     // key 9 play macro
     case 9:
-      if (is_pressed) {
+    case 8:
+    case 7:
+    case 6:
+      if (is_pressed && !is_playing) {
         is_playing = true;
         setOverrideColor(key, colorIndicateEnabled);
-        play_macro();
+        play_macro(col);
         is_playing = false;
         clearOverrideColor(key);
       }
@@ -382,25 +391,28 @@ void onMatrixChange(int profile, int row, int col, bool is_pressed) {
 
     // key 0 start/stop recording
     case 0:
+    case 1:
+    case 2:
+    case 3:
       if (is_pressed) {
-        if (is_recording) {
-          is_recording = false;
+        if ((is_recording != MACRO_OFF) && (is_recording == col+1)) {
           Serial.println("Macro recording stopped.");
-          if (macro_len == 0) {
+          if (macro_len[col] == 0) {
             Serial.println("No macro recorded.");
-            undo_clear_macro();
+            undo_clear_macro(col);
             setOverrideColor(key, colorIndicateDisabled, millis() + pixelOverrideDuration);
           }
           else {
             setOverrideColor(key, colorIndicateEnabled, millis() + pixelOverrideDuration);
           }
-        } else {
-          is_recording = true;
+          is_recording = MACRO_OFF;
+        } else if (is_recording == MACRO_OFF) {
+          is_recording = col+1;
           Serial.println("Macro recording started.");
           setOverrideColor(key, colorIndicateRecording);
-          if (macro_len > 0) {
-            Serial.printf("Overwriting existing macro of length %u.\r\n", macro_len);
-            clear_macro();
+          if (macro_len[col] > 0) {
+            Serial.printf("Overwriting existing macro of length %u.\r\n", macro_len[col]);
+            clear_macro(col);
           }
         }
       }
@@ -572,7 +584,7 @@ extern "C" {
       } else {
         const hid_keyboard_report_t* boot_report = (const hid_keyboard_report_t*)report;
         if (should_save_to_macro()) {
-          save_to_macro(boot_report);
+          save_to_macro(boot_report, is_recording-1);
         }
 
         // NOTE: for better performance you should save/queue remapped report instead of

@@ -4,10 +4,11 @@
 static bool FS_ENABLED = true;
 
 enum MACRO_i {
-  MACRO0 = 0,
-  // MACRO1 = 1,
-  // MACRO2 = 2,
-  // MACRO3 = 3,
+  MACRO_OFF = 0,
+  MACRO0 = 1,
+  MACRO1 = 2,
+  MACRO2 = 3,
+  MACRO3 = 4,
 };
 
 
@@ -20,15 +21,17 @@ void load_macro_from_FS(hid_keyboard_report_t out_macroBuffer[], unsigned long o
     case MACRO0:
       f = LittleFS.open("/macro0", "r");
       break;
-    // case MACRO1:
-    //   f = LittleFS.open("/macro1", "r");
-    //   break;
-    // case MACRO2:
-    //   f = LittleFS.open("/macro2", "r");
-    //   break;
-    // case MACRO3:
-    //   f = LittleFS.open("/macro3", "r");
-    //   break;
+    case MACRO1:
+      f = LittleFS.open("/macro1", "r");
+      break;
+    case MACRO2:
+      f = LittleFS.open("/macro2", "r");
+      break;
+    case MACRO3:
+      f = LittleFS.open("/macro3", "r");
+      break;
+    case MACRO_OFF:
+      return;
   }
   if (f) {
     char buffer[12];
@@ -62,15 +65,17 @@ void write_macro_to_FS(const hid_keyboard_report_t out_macroBuffer[], const unsi
     case MACRO0:
       f = LittleFS.open("/macro0", "w");
       break;
-    // case MACRO1:
-    //   f = LittleFS.open("/macro1", "w");
-    //   break;
-    // case MACRO2:
-    //   f = LittleFS.open("/macro2", "w");
-    //   break;
-    // case MACRO3:
-    //   f = LittleFS.open("/macro3", "w");
-    //   break;
+    case MACRO1:
+      f = LittleFS.open("/macro1", "w");
+      break;
+    case MACRO2:
+      f = LittleFS.open("/macro2", "w");
+      break;
+    case MACRO3:
+      f = LittleFS.open("/macro3", "w");
+      break;
+    case MACRO_OFF:
+      return;
   }
   if (f) {
     char buffer[12];
